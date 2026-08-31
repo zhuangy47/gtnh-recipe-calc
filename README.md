@@ -11,7 +11,6 @@ pip install flask pillow
 python run.py
 ```
 
-opens http://127.0.0.1:5057/ in a browser. `--port 8080` and `--no-browser` if
-you want them.
+opens http://127.0.0.1:5057/ in a browser. `--port 8080` if you want.
 
 the first start takes about half a minute because uncompression
