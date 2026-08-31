@@ -1,0 +1,60 @@
+{# The intrinsic size matters: without it the browser lays every icon out at
+   zero height, decides the whole list is "in the viewport", and defeats
+   loading="lazy" -- which on a 665-icon node page is the difference between
+   fetching a screenful and fetching all of them. #}
+{% macro thing(o, size='sm', link=true) -%}
+{%- if o -%}
+{%- set px = {'sm': 22, 'lg': 48}.get(size, 32) -%}
+<img class="icon {{ size }}" src="{{ url_for('icon', ix=o.ix) }}" alt=""
+     width="{{ px }}" height="{{ px }}" loading="lazy" decoding="async">
+<span class="nm trunc">{% if link %}<a href="{{ url_for('item_view', ix=o.ix) }}">{{ o.name }}</a>{% else %}{{ o.name }}{% endif %}
+  <span class="gid tiny muted">{{ o.gid }}</span></span>
+{%- else -%}<span class="muted">(unknown)</span>{%- endif -%}
+{%- endmacro %}
+
+{% macro machine_badge(r) -%}
+{% if r.custom %}<span class="badge">hand-entered</span>
+{% elif r.map is none %}<span class="badge">placed by hand</span>
+{% else %}<span class="badge">{{ r.name }}</span>{% endif %}
+{%- if r.tier %}<span class="badge">min {{ r.tier }}</span>{% endif %}
+{%- endmacro %}
+
+{% macro searchbox(field, placeholder='search items and fluids', kind='') -%}
+<div class="searchbox">
+  <input type="search" class="js-search" name="{{ field }}__text"
+         data-field="{{ field }}" data-kind="{{ kind }}"
+         placeholder="{{ placeholder }}" autocomplete="off" style="width:100%">
+  <input type="hidden" name="{{ field }}" class="js-value">
+  <div class="results"></div>
+  <div class="chosen small muted"></div>
+</div>
+{%- endmacro %}
+
+{# One quantity of one item, written the way the reader asked for.  The item is
+   what makes the number stackable, so it is not optional here: `qty` alone is
+   for the numbers that have no item behind them -- runs, uses, how many nodes
+   are still undecided.
+
+   Nothing is lost by switching: in stacks mode the plain total moves into the
+   tooltip, and an item that does not stack says so, because "5" reading the
+   same in both modes is otherwise a puzzle.  Fluids are millibuckets and have
+   no stack at all, so they say nothing extra. #}
+{% macro amount(x, ix, cls='q') -%}
+{%- set note = stack_note(x, ix) -%}
+<span class="{{ cls }}"{% if note %} title="{{ note }}"{% endif %}>{{ qty(x, ix) }}<span class="tiny muted">{{ unit(ix) }}</span></span>
+{%- endmacro %}
+
+{# Counts or stacks.  A view preference, not a decision: it lives in a cookie,
+   the plan file never hears about it, and every page that shows a quantity
+   offers the same switch and comes straight back to where you were. #}
+{% macro units_toggle() -%}
+<span class="tabs units" style="margin:0" title="show how many, or how many stacks">
+  <form class="inline" method="post" action="{{ url_for('set_units') }}">
+    <input type="hidden" name="to" value="{{ request.full_path.rstrip('?') }}">
+    <button name="mode" value="count" class="{{ 'on' if not stacked else '' }}"
+            title="plain totals">count</button>
+    <button name="mode" value="stacks" class="{{ 'on' if stacked else '' }}"
+            title="how many stacks, and how many left over">stacks</button>
+  </form>
+</span>
+{%- endmacro %}

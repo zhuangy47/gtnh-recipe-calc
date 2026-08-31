@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m with context %}
+{% block body %}
+
+<div class="cols">
+  <div>
+    <h1>Plans</h1>
+    <p class="muted">A plan is a route you chose: name an item, pick a recipe at
+    each step, and stop wherever you would rather buy or mine the thing. What you
+    stopped on is your shopping list.</p>
+
+    {% if plans %}
+    <div class="panel">
+      <table>
+        <thead><tr><th>plan</th><th>making</th><th class="num">steps</th><th></th></tr></thead>
+        <tbody>
+        {% for p in plans %}
+          <tr>
+            <td><a href="{{ url_for('plan_view', pid=p.id) }}"><b>{{ p.name }}</b></a>
+                {% if p.note %}<div class="tiny muted trunc">{{ p.note }}</div>{% endif %}</td>
+            <td>
+              {% for r in p.roots %}
+                {% set n = p.nodes.get(r.node) %}
+                {% if n %}<div class="row small">{{ m.thing(obj(n.ix), 'sm', false) }}
+                  <span class="muted nowrap">&times; {{ qty(r.qty) }}</span></div>{% endif %}
+              {% else %}<span class="muted small">nothing chosen yet</span>{% endfor %}
+            </td>
+            <td class="num">{{ p.nodes|length }}</td>
+            <td class="num">
+              <form class="inline" method="post" action="{{ url_for('duplicate_plan', pid=p.id) }}">
+                <button class="small ghost" title="Copy this plan">duplicate</button>
+              </form>
+              <form class="inline" method="post" action="{{ url_for('delete_plan', pid=p.id) }}"
+                    onsubmit="return confirm('Delete {{ p.name }}?')">
+                <button class="small ghost danger">delete</button>
+              </form>
+            </td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="note">No plans yet. Name one on the right and pick what you want
+      to make &mdash; an electronic circuit, a stack of steel plates, or the first
+      block of a multiblock.</div>
+    {% endif %}
+  </div>
+
+  <div>
+    <h1>New plan</h1>
+    <form method="post" action="{{ url_for('create_plan') }}" class="panel stack">
+      <label>Name<br><input type="text" name="name" placeholder="resistors via assembler" style="width:100%"></label>
+      <label>What do you want to make?<br>{{ m.searchbox('ix') }}</label>
+      <label>How many <input type="number" name="qty" value="1" min="1" step="1"></label>
+      <button class="primary" type="submit">Create plan</button>
+      <p class="tiny muted">You can add more items to a plan later. For a
+        multiblock, add one item per kind of block and take the counts from the
+        structure preview in NEI.</p>
+    </form>
+
+    <h2>How it works</h2>
+    <div class="panel small stack">
+      <div><b>1. Say what you want.</b> An item, and how many.</div>
+      <div><b>2. Pick a recipe.</b> Every recipe that makes it is listed, with
+        the machine it runs on and the lowest voltage that will run it.</div>
+      <div><b>3. Keep going.</b> That recipe's inputs are the next things to
+        decide.</div>
+      <div><b>4. Stop where you like.</b> Mark an item final &mdash; you will buy
+        it, mine it, or you already have it &mdash; and it goes on the shopping
+        list instead of expanding.</div>
+      <div class="muted">Demand for the same item on the same recipe is added up
+        across the whole plan before it is rounded up to whole runs, so you are
+        not charged for waste you would never produce. Spare output is listed,
+        never subtracted for you.</div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}<script src="{{ url_for('static', filename='app.js') }}"></script>{% endblock %}

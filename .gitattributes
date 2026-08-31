@@ -1,0 +1,7 @@
+# The archives are binary. Git's own detection already gets this right, but a
+# clone with core.autocrlf=true and a mangled 62 MB archive is an unpleasant
+# way to find out, so say it outright.
+*.xz binary
+*.zip binary
+*.sqlite binary
+*.pickle binary

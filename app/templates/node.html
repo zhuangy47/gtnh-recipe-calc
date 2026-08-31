@@ -1,0 +1,302 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m with context %}
+{% block title %}{{ it.name if it else 'node' }} &mdash; {{ plan.name }}{% endblock %}
+{% block body %}
+{# Which route view sent us here.  Carried through every link and posted with
+   every decision, so a walk begun in the graph does not end in the list. #}
+{% set back = request.args.get('back') %}
+{% macro backfield() %}{% if back %}<input type="hidden" name="back" value="{{ back }}">{% endif %}{% endmacro %}
+
+{# A div and not a p: the units switch is a form, and the HTML parser closes
+   an open p when it meets one -- which put the switch outside this row and
+   took the "next undecided" button with it. #}
+<div class="small spread" style="margin:0 0 14px"><a href="{{ url_for('plan_graph', pid=plan.id) if back == 'graph' else url_for('plan_view', pid=plan.id) }}">&larr; {{ plan.name }}</a>
+  <span class="row">{{ m.units_toggle() }}
+  {% if next_open %}<a class="btn small" href="{{ url_for('node_view', pid=plan.id, nid=next_open, back=back or none) }}">next undecided &rarr;</a>{% endif %}</span></div>
+
+<div class="panel spread" style="margin-bottom:14px">
+  <div class="row">
+    <img class="icon lg" src="{{ url_for('icon', ix=node.ix) }}" alt=""
+         width="48" height="48" decoding="async">
+    <div>
+      <h1>{{ it.name if it else node.ix }}</h1>
+      <div class="small muted mono">{{ it.gid if it else node.ix }}</div>
+      <div class="small muted">
+        {% if it and it.tags %}{{ it.tags|join(', ') }}{% endif %}
+        {% if it and it.form %} &middot; <b>{{ it.form }} {{ it.material }}</b>{% endif %}
+      </div>
+    </div>
+  </div>
+  <div style="text-align:right">
+    <div class="muted small">needed here</div>
+    <div style="font-size:26px;font-weight:700">{{ qty(demand, node.ix) }}<span class="small muted"> {{ unit(node.ix) }}</span></div>
+    {% if stack_note(demand, node.ix) %}<div class="tiny muted">{{ stack_note(demand, node.ix) }}</div>{% endif %}
+    {% if uses %}<div class="small">{{ qty(uses) }} {{ plural(uses, 'use') }}{%
+      if crafts %} of the {{ qty(crafts) }} crafts one tool lasts{% endif %}</div>{% endif %}
+    {% if per_run %}<div class="tiny muted">{{ qty(per_run) }}{{ unit(node.ix) }} per run of the recipe above</div>{% endif %}
+  </div>
+</div>
+
+{% if ore_seeded %}
+<div class="note warn"><b>This is an ore, so the plan stops here by default.</b>
+  There are recipes for it below &mdash; nearly all of them Space Mining &mdash; but
+  nothing expands here unless you pick one.</div>
+{% endif %}
+
+<div class="cols">
+<div>
+
+<h2>Stop here</h2>
+<div class="panel">
+  <p class="small muted">Stop here and {{ it.name if it else 'this item' }} becomes
+    something you buy, mine or already have. It goes on the raw materials list with
+    its quantity, and nothing below it is worked out.</p>
+
+  {% if final_everywhere %}
+    <div class="note small"><b>{{ it.name if it else 'This item' }} is final
+      everywhere in this plan.</b>
+      {% if places > 1 %}It appears at {{ places }} places{% else %}It appears
+      here{% endif %}, and anywhere it turns up later &mdash; when you expand
+      another recipe that needs it &mdash; it will be final there too, without
+      you having to say so again.
+      {% if expanded_elsewhere %}
+        <br>{{ expanded_elsewhere|length }} other {{ plural(expanded_elsewhere|length, 'place') }} {{ plural(expanded_elsewhere|length, 'has', 'have') }} a recipe you
+        picked yourself, and those keep it.
+      {% endif %}
+    </div>
+  {% endif %}
+
+  <form class="row wrap" method="post" action="{{ url_for('stop_node', pid=plan.id, nid=node.id) }}">
+    {{ backfield() }}<button class="primary">stop here</button>
+    <select name="scope" title="marking something final normally applies to the item everywhere, not just here">
+      <option value="everywhere">everywhere in this plan{% if places > 1 %} ({{ places }} places){% endif %}</option>
+      <option value="here">only this one</option>
+    </select>
+  </form>
+
+  {% if node.choice.kind != 'open' or final_everywhere %}
+    <form class="inline" method="post" action="{{ url_for('open_node', pid=plan.id, nid=node.id) }}"
+          style="margin-top:10px">
+      {{ backfield() }}<button class="ghost">reopen &mdash; throw away the decisions below this point{% if final_everywhere %},
+        and stop treating this item as final everywhere{% endif %}</button>
+    </form>
+  {% endif %}
+</div>
+
+{% if node.choice.auto %}
+<div class="note"><b>Copied from an earlier choice.</b> You had already worked out
+  how you make {{ it.name if it else 'this' }} elsewhere in this plan, so the whole
+  thing was copied here. It is an ordinary copy &mdash; pick a different recipe
+  below, or reopen it, and nothing else changes.</div>
+{% elif node.choice.kept %}
+<div class="note"><b>Left open on purpose.</b> You reopened this one, so it stays
+  on the list of things to obtain even if you work out how to make
+  {{ it.name if it else 'this item' }} somewhere else in the plan. Pick a recipe
+  below whenever you want to change that.</div>
+{% endif %}
+
+{% if other_plans %}
+<h2>Use an existing plan</h2>
+<div class="panel">
+  <p class="small muted">There is already a plan for this item. Use it and this
+    step follows that plan's decisions, worked out for the amount needed here.</p>
+  {% for p in other_plans %}
+    <form class="inline" method="post" action="{{ url_for('use_plan', pid=plan.id, nid=node.id) }}">
+      {{ backfield() }}<input type="hidden" name="plan" value="{{ p.id }}">
+      <button>use &ldquo;{{ p.name }}&rdquo;</button>
+    </form>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% if tool_variants and parent_recipe %}
+<h2>Which one will you use?</h2>
+<div class="panel">
+  <p class="small muted">This slot takes a tool, and how long a tool lasts depends
+    on what it is made of. Pick a material and the plan charges you the fraction of
+    the tool you actually use up.
+    {% if uses %}<b>This plan uses it {{ qty(uses) }} {{ plural(uses, 'time') }}</b>
+    whatever it is made of &mdash; that part does not change with the material.
+    {% if not crafts %}Until you pick one there is no durability to divide by, so it
+    is counted as one tool you own for the whole plan; the {{ qty(uses) }} tells you
+    whether one would survive that.{% endif %}{% else %}
+    Without one it is counted as a single tool you own for the whole plan.{% endif %}</p>
+  <form class="row wrap" method="post" action="{{ url_for('set_tool', pid=plan.id, nid=node.id) }}">
+    {{ backfield() }}<select name="variant">
+      <option value="">&mdash; not chosen: counted as one tool you own &mdash;</option>
+      {% for v in tool_variants %}
+        <option value="{{ v.ix }}" {{ 'selected' if chosen_tool == v.ix else '' }}>
+          {{ v.tool_material }} &mdash; {{ v.max_damage }} damage</option>
+      {% endfor %}
+    </select>
+    <select name="scope" title="you own one tool, so this normally applies to every recipe that calls for it">
+      <option value="everywhere" {{ '' if tool_scope == 'here' else 'selected' }}>everywhere in this plan</option>
+      <option value="here" {{ 'selected' if tool_scope == 'here' else '' }}>only in this recipe</option>
+    </select>
+    <button>set material</button>
+  </form>
+</div>
+{% endif %}
+
+{% if parent_recipe and designation %}
+<h2>What happens to it in {{ parent_recipe.name }}?</h2>
+<div class="panel">
+  <div class="small"><b>{{ designation.kind }}</b> &mdash; {{ DESIGNATION_HELP[designation.kind] }}
+    <div class="muted">{{ designation.why }}
+      <span class="badge">{{ 'your correction' if designation.provenance == 'user'
+        else 'worked out automatically' }}</span></div></div>
+  <form class="row wrap" method="post" style="margin-top:8px"
+        action="{{ url_for('set_designation', pid=plan.id, nid=node.id) }}">
+    {{ backfield() }}<select name="kind">
+      <option value="auto">&mdash; use the guess &mdash;</option>
+      {% for d in DESIGNATIONS %}<option value="{{ d }}" {{ 'selected' if designation.is_user and designation.kind == d else '' }}>{{ d }} &mdash; {{ DESIGNATION_HELP[d] }}</option>{% endfor %}
+    </select>
+    <select name="scope">
+      <option value="item">for this item everywhere</option>
+      <option value="recipe">only in this recipe</option>
+    </select>
+    <button>correct it</button>
+  </form>
+  <p class="tiny muted">You can correct this for the item everywhere, or only in
+    this recipe: a hammer is worn as a tool by thousands of recipes and
+    <em>consumed</em> by the one that melts it down. Your corrections are kept
+    separately, so re-exporting the pack does not overwrite them.</p>
+</div>
+{% endif %}
+
+</div>
+
+<!-- ============ the choices ============ -->
+<div>
+<h2>{{ n_choices }} {{ plural(n_choices, 'recipe') }} {{ plural(n_choices, 'makes', 'make') }} this{% if q %}
+  <span class="small muted">with an input matching &ldquo;{{ q }}&rdquo;, of {{ n_unfiltered }}</span>{% endif %}</h2>
+
+<form class="row wrap" method="get" style="margin-bottom:8px"
+      action="{{ url_for('node_view', pid=plan.id, nid=node.id) }}">
+  {{ backfield() }}
+  {% if only %}<input type="hidden" name="map" value="{{ only }}">{% endif %}
+  <input type="search" name="q" value="{{ q }}" style="flex:1;min-width:180px"
+         placeholder="filter by an input &mdash; plank, dust, molten tin &hellip;">
+  <button>filter</button>
+  {% if q %}<a class="btn" href="{{ url_for('node_view', pid=plan.id, nid=node.id, map=only, back=back or none) }}">clear</a>{% endif %}
+</form>
+<p class="tiny muted">The filter matches any item a slot will accept, not just the
+  one it happens to show: a Lathe recipe whose wood slot takes 29 different planks
+  matches &ldquo;plank&rdquo; even though it displays
+  &ldquo;Larch Wood Planks&rdquo;. It works together with the machine tabs below.</p>
+
+{% if groups|length > 1 or q %}
+<div class="tabs">
+  <a class="{{ 'on' if not only else '' }}" href="{{ url_for('node_view', pid=plan.id, nid=node.id, q=q or none, back=back or none) }}">all {{ n_choices }}</a>
+  {% for g in groups %}
+    <a class="{{ 'on' if only == g.map else '' }}"
+       href="{{ url_for('node_view', pid=plan.id, nid=node.id, map=g.map, q=q or none, back=back or none) }}">{{ g.name }} ({{ g.n }})</a>
+  {% endfor %}
+</div>
+<p class="tiny muted">Several recipes on the same machine is normal. Narrow by
+  machine, then compare the inputs.</p>
+{% endif %}
+
+{% if q and not choices %}
+  <div class="note">No recipe here takes an input matching &ldquo;{{ q }}&rdquo;{% if only %}
+    on this machine{% endif %}. <a href="{{ url_for('node_view', pid=plan.id, nid=node.id, back=back or none) }}">Clear the filters</a>
+    to see all {{ n_unfiltered }}.</div>
+{% endif %}
+
+{% if not choices and not q and not only %}
+  <div class="note">No recipe in the pack data makes {{ it.name if it else 'it' }}
+    &mdash; mine it, gather it or buy it.
+    {% if hidden %} ({{ hidden|length }} {{ plural(hidden|length, 'recipe') }} {{ plural(hidden|length, 'needs', 'need') }} it to make it; see below.){% endif %}
+  </div>
+{% endif %}
+
+{% for c in choices %}
+  {% set r = c.recipe %}
+  <form class="card {{ 'gated' if c.gated else '' }}" method="post"
+        action="{{ url_for('choose_recipe', pid=plan.id, nid=node.id) }}">
+    {{ backfield() }}<input type="hidden" name="recipe" value="{{ r.rid }}">
+    <h3>
+      {{ m.machine_badge(r) }}
+      <span>makes <b>{{ c.qty }}</b>{{ unit(node.ix) }}</span>
+      {% if c.chanced %}<span class="badge chance">{{ (c.chance*100)|round(1) }}% &mdash; an average, not a guarantee</span>{% endif %}
+      {% if c.gated %}<span class="badge gated" title="{{ c.reason }}">gated: {{ c.reason }}</span>{% endif %}
+      {% if node.choice.kind == 'recipe' and node.choice.recipe == r.rid %}<span class="badge recipe">chosen</span>{% endif %}
+      <span class="right"><button class="primary small" type="submit">use this</button></span>
+    </h3>
+
+    <div class="slotgrid">
+      {% for s in r.slots %}
+        {% set chosen = node.choice.picks.get(s.key|string) if node.choice.kind == 'recipe' else None %}
+        <div class="slot">
+          {% if s.set_valued %}
+            {# An <option> cannot carry a picture, so the icon sits beside the
+               select and follows it -- otherwise a substitutable slot is the one
+               place in the app where you choose an item unseen. #}
+            {% set cur = chosen if chosen and chosen in s.members|map(attribute=0) else s.members[0][0] %}
+            {% set co = obj(cur) %}
+            <img class="icon sm js-pic" src="{{ url_for('icon', ix=cur) }}" alt=""
+                 width="22" height="22" loading="lazy" decoding="async"
+                 title="{{ co.name if co else cur }}">
+            <select name="pick:{{ s.key }}" class="js-picker"
+                    title="{{ s.tag or 'this slot accepts any of these' }}">
+              {% for mix, mq in s.members %}
+                {% set mo = obj(mix) %}
+                <option value="{{ mix }}" data-icon="{{ url_for('icon', ix=mix) }}"
+                        data-name="{{ mo.name if mo else mix }}"
+                        {{ 'selected' if chosen == mix else '' }}>
+                  {{ mo.name if mo else mix }} &times;{{ mq if mq else 1 }}{{ unit(mix) }}</option>
+              {% endfor %}
+            </select>
+            <span class="badge" title="{{ s.members|length }} items are accepted here">{{ s.tag or 'any of %d'|format(s.members|length) }}</span>
+          {% else %}
+            {% set mo = obj(s.members[0][0]) %}
+            {{ m.thing(mo, 'sm', false) }}
+            <span class="x">&times;{{ s.members[0][1] if s.members[0][1] else 1 }}{{ unit(s.members[0][0]) }}</span>
+            {% if not s.members[0][1] %}<span class="badge tool" title="needed for the recipe but not used up">kept</span>{% endif %}
+          {% endif %}
+        </div>
+      {% endfor %}
+      {% if not r.slots %}<span class="muted small">no inputs recorded</span>{% endif %}
+    </div>
+
+    {% if r.outputs|length > 1 %}
+      <div class="small muted">also produces:
+        {% for o in r.byproducts(node.ix) %}
+          {% set oo = obj(o[0]) %}
+          <span class="badge">{{ oo.name if oo else o[0] }} &times;{{ o[1] }}{{ unit(o[0]) }}{% if o[2] < 1 %} @ {{ (o[2]*100)|round(1) }}%{% endif %}</span>
+        {% endfor %}
+      </div>
+    {% endif %}
+    {% if r.gt %}
+      <div class="tiny muted">{{ r.gt[0] }} EU/t, {{ r.gt[2] }} ticks{% if r.gt[4] %}, cleanroom{% endif %}{% if r.gt[5] %}, low gravity{% endif %}</div>
+    {% endif %}
+    <div class="tiny muted mono">{{ r.rid }}</div>
+  </form>
+{% endfor %}
+
+{% if hidden %}
+<details>
+  <summary>{{ hidden|length }} {{ plural(hidden|length, 'recipe') }} not offered &mdash; they need this item to make it</summary>
+  <div class="note warn small">
+    Each of these takes the item it produces as one of its own inputs: backpack
+    dyeing, rune cycling, tool repair, unification presses. They are real recipes,
+    but none of them is a way to <em>make</em> the item, so they are not offered
+    here.
+  </div>
+  {% for c in hidden %}
+    <div class="card"><h3>{{ m.machine_badge(c.recipe) }} makes {{ c.qty }}</h3>
+      <div class="tiny muted mono">{{ c.recipe.rid }}</div></div>
+  {% endfor %}
+</details>
+{% endif %}
+
+<div class="hr"></div>
+<p class="small muted">Missing a recipe? Anything the app does not know about
+  &mdash; a multiblock read off NEI's structure preview, say &mdash; can be
+  <a href="{{ url_for('custom_recipes') }}">entered by hand</a>, and is then offered
+  here like any other recipe.</p>
+</div>
+</div>
+{% endblock %}
+
+{% block scripts %}<script src="{{ url_for('static', filename='app.js') }}"></script>{% endblock %}

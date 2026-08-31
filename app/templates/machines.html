@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}machines &mdash; {{ plan.name }}{% endblock %}
+{% block body %}
+<p class="small"><a href="{{ url_for('plan_view', pid=plan.id) }}">&larr; {{ plan.name }}</a></p>
+<h1>Which machines do you have?</h1>
+<p class="muted" style="max-width:70ch">Saying what you own changes nothing in the
+cost &mdash; building a machine is never counted as part of what it makes. It only
+marks the recipes you cannot run yet as <span class="badge gated">gated</span>, so
+you can tell "I need to build the machine" apart from "I need more materials".</p>
+<p class="small muted">Pick the highest voltage tier you own for each machine. You
+can run a recipe if you have the machine and your tier is at least the minimum the
+recipe asks for.</p>
+
+<form method="post" class="panel">
+  <div class="row" style="margin-bottom:12px">
+    <button name="mode" value="all" class="{{ 'primary' if plan.machines is none else '' }}">
+      I have everything &mdash; do not filter</button>
+    <button name="mode" value="some" class="primary">save the selection below</button>
+  </div>
+  <table>
+    <thead><tr><th>machine</th><th class="mono">recipe map</th>
+               <th class="num">recipes</th><th>highest tier you own</th></tr></thead>
+    <tbody>
+    {% for mp in maps %}
+      {% if mp.recipes > 0 %}
+      <tr>
+        <td>{{ mp.name }}</td>
+        <td class="mono tiny">{{ mp.map }}</td>
+        <td class="num">{{ "{:,}".format(mp.recipes) }}</td>
+        <td>
+          {% set cur = (plan.machines or {}).get(mp.map) %}
+          <select name="map:{{ mp.map }}">
+            <option value="-">&mdash; do not have &mdash;</option>
+            {% if mp.tiers %}
+              {% for t in mp.tiers %}
+                {% set idx = loop.index0 %}
+                <option value="{{ TIER_INDEX[t] }}" {{ 'selected' if cur is not none and cur == TIER_INDEX[t] else '' }}>{{ t }}</option>
+              {% endfor %}
+            {% else %}
+              <option value="0" {{ 'selected' if cur is not none else '' }}>have it</option>
+            {% endif %}
+          </select>
+        </td>
+      </tr>
+      {% endif %}
+    {% endfor %}
+    </tbody>
+  </table>
+</form>
+{% endblock %}

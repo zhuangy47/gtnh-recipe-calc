@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m with context %}
+{% block title %}hand-entered recipes{% endblock %}
+{% block body %}
+
+<h1>Hand-entered recipes</h1>
+<p class="muted" style="max-width:76ch">A recipe the pack data does not have: a
+name, and a list of items with quantities. Enter a multiblock the same way &mdash;
+leave the machine blank, and use the block counts from the structure preview in
+NEI. Once saved, it is offered like any other recipe, and each block expands
+normally from there.</p>
+<p class="small muted">Block counts are the one thing you have to type in. The
+controller and the casings are ordinary items with ordinary recipes, but nothing
+exports the structure layout itself.</p>
+
+{% if request.args.get('err') %}<div class="note bad">{{ request.args.get('err') }}</div>{% endif %}
+
+<div class="cols">
+<div>
+  <h2>Entered so far</h2>
+  {% for r in rows %}
+    <div class="card">
+      <h3>{{ r.name }}
+        {% if r.machine %}<span class="badge">{{ r.machine }}</span>
+        {% else %}<span class="badge">placed by hand</span>{% endif %}
+        <span class="right">
+          <form class="inline" method="post" action="{{ url_for('delete_custom_recipe', rid=r.id) }}"
+                onsubmit="return confirm('Delete this recipe?')">
+            <button class="small ghost danger">delete</button></form>
+        </span>
+      </h3>
+      <div class="slotgrid">
+        {% for i in r.inputs %}
+          <div class="slot">{{ m.thing(obj(i.ix), 'sm', false) }}<span class="x">&times;{{ i.qty }}</span></div>
+        {% endfor %}
+        <span class="arrow">&rarr;</span>
+        {% for o in r.outputs %}
+          <div class="slot">{{ m.thing(obj(o.ix), 'sm', false) }}<span class="x">&times;{{ o.qty }}</span></div>
+        {% endfor %}
+      </div>
+      {% if r.note %}<div class="small muted">{{ r.note }}</div>{% endif %}
+      <form class="inline" method="post" action="{{ url_for('clone_custom_recipe', rid=r.id) }}">
+        <input type="text" name="material" placeholder="Steel" size="10">
+        <button class="small">clone in another material</button>
+        <span class="tiny muted">&mdash; e.g. the same tank, but in steel</span>
+      </form>
+      <div class="tiny muted mono">{{ r.id }}</div>
+    </div>
+  {% else %}
+    <div class="note">Nothing entered yet.</div>
+  {% endfor %}
+</div>
+
+<div>
+  <h2>New</h2>
+  <form method="post" action="{{ url_for('new_custom_recipe') }}" class="panel stack">
+    <label>Name<br><input type="text" name="name" style="width:100%"
+           placeholder="Railcraft Iron Tank 5x5x5, 4 gauges"></label>
+    <label>Machine <span class="muted small">&mdash; leave blank for a structure you place by hand</span><br>
+      <input type="text" name="machine" style="width:100%" placeholder=""></label>
+    <label>Note<br><input type="text" name="note" style="width:100%"
+           placeholder="counts read off the NEI structure preview"></label>
+
+    <div>
+      <h3>Makes</h3>
+      <label class="small">A thing the game does not have &mdash; a whole tank, say<br>
+        <input type="text" name="makes" style="width:100%"
+               placeholder="Railcraft Iron Tank 5x5x5"></label>
+      <p class="tiny muted">Naming something here creates it, so you can ask for
+        one and watch it expand into its blocks. It exists only in this app.
+        Leave it blank to pick a real item below instead.</p>
+      <div id="outs">
+        <div class="row wrap" style="margin-bottom:6px">
+          <div style="flex:1 1 240px">{{ m.searchbox('out_ix:1', 'or an item the game does have') }}</div>
+          <input type="number" name="out_qty:1" value="1" min="1">
+        </div>
+      </div>
+      <button type="button" class="small" data-add-row="#tpl-out" data-into="#outs">+ another output</button>
+    </div>
+
+    <div>
+      <h3>From</h3>
+      <div id="ins">
+        {% for n in range(1, 5) %}
+        <div class="row wrap" style="margin-bottom:6px">
+          <div style="flex:1 1 240px">{{ m.searchbox('in_ix:%d'|format(n)) }}</div>
+          <input type="number" name="in_qty:{{ n }}" value="1" min="1">
+        </div>
+        {% endfor %}
+      </div>
+      <button type="button" class="small" data-add-row="#tpl-in" data-into="#ins">+ another input</button>
+    </div>
+
+    <button class="primary" type="submit">save recipe</button>
+  </form>
+</div>
+</div>
+
+<template id="tpl-in">
+  <div class="row wrap" style="margin-bottom:6px">
+    <div style="flex:1 1 240px">{{ m.searchbox('in_ix:__N__') }}</div>
+    <input type="number" name="in_qty:__N__" value="1" min="1">
+  </div>
+</template>
+<template id="tpl-out">
+  <div class="row wrap" style="margin-bottom:6px">
+    <div style="flex:1 1 240px">{{ m.searchbox('out_ix:__N__') }}</div>
+    <input type="number" name="out_qty:__N__" value="1" min="1">
+  </div>
+</template>
+{% endblock %}
+
+{% block scripts %}<script src="{{ url_for('static', filename='app.js') }}"></script>{% endblock %}

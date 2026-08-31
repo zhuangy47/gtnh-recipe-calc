@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}swap material &mdash; {{ plan.name }}{% endblock %}
+{% block body %}
+<p class="small"><a href="{{ url_for('plan_view', pid=plan.id) }}">&larr; {{ plan.name }}</a></p>
+<h1>Swap a material across the whole route</h1>
+<p class="muted" style="max-width:74ch">Copies this plan and swaps every item made
+of one material for the same kind of item in another: iron plate becomes steel
+plate, iron casing becomes steel casing. Hand-entered recipes are copied and
+swapped too. The plan you are on is left untouched, so you can compare the two.</p>
+<p class="small muted">Anything whose item changed comes back
+<span class="badge open">undecided</span>, because a different item is made by a
+different recipe. Everything else keeps the choice you made.</p>
+
+{% if error %}<div class="note bad">{{ error }}</div>{% endif %}
+
+{% if not materials %}
+  <div class="note">Nothing in this plan has a material on it yet. Items get one
+    from their oredict tag; the GT casings, coils and Railcraft tank blocks that
+    carry no tag need an entry in
+    <span class="mono">data/classification_overlay.json</span> first.</div>
+{% else %}
+<form method="post" class="panel stack" style="max-width:640px">
+  <label>From<br>
+    <select name="from">
+      {% for mt in materials %}<option value="{{ mt }}">{{ mt }}</option>{% endfor %}
+    </select></label>
+  <label>To<br>
+    {% if targets %}
+    <input list="mats" type="text" name="to" placeholder="Steel">
+    <datalist id="mats">{% for t in targets %}<option value="{{ t }}">{% endfor %}</datalist>
+    {% else %}
+    <input type="text" name="to" placeholder="Steel">
+    {% endif %}
+    <span class="tiny muted">{{ targets|length }} {{ plural(targets|length, 'material') }} {{ plural(targets|length, 'exists', 'exist') }} in every shape this plan uses</span>
+  </label>
+  <label>Name the copy<br><input type="text" name="name" style="width:100%"
+         placeholder="{{ plan.name }} (steel)"></label>
+  <button class="primary">create the variant</button>
+</form>
+{% endif %}
+{% endblock %}

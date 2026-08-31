@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m with context %}
+{% block title %}{{ it.name }}{% endblock %}
+{% block body %}
+<div class="panel row" style="margin-bottom:14px">
+  <img class="icon lg" src="{{ url_for('icon', ix=it.ix) }}" alt="">
+  <div>
+    <h1>{{ it.name }}</h1>
+    <div class="small muted mono">{{ it.gid }}</div>
+  </div>
+</div>
+
+<div class="cols">
+<div>
+  <h2>Details</h2>
+  <div class="panel">
+    <dl class="kv small">
+      <dt>internal id</dt><dd class="mono tiny">{{ it.ix }}</dd>
+      <dt>entries in the data</dt><dd>{{ it.members|length }}{% if it.members|length > 1 %}
+        &mdash; treated as one item: they differ only in NBT that does not make
+        them different things{% endif %}</dd>
+      <dt>oredict tags</dt><dd>{% if it.tags %}{{ it.tags|join(', ') }}{% else %}
+        <span class="muted">none &mdash; add an entry in
+        data/classification_overlay.json to include this item in a material
+        swap</span>{% endif %}</dd>
+      <dt>label</dt><dd>{% if it.form %}<b>{{ it.form }} {{ it.material }}</b>
+        <span class="muted">&mdash; what a material swap matches on</span>
+        {% else %}<span class="muted">none</span>{% endif %}</dd>
+      {% if it.tool_material %}
+      <dt>tool</dt><dd>{{ it.tool_material }}, {{ it.max_damage }} damage</dd>
+      {% endif %}
+      <dt>consumption</dt><dd><b>{{ designation.kind }}</b>
+        <span class="muted">&mdash; {{ designation.why }}</span></dd>
+    </dl>
+  </div>
+
+  {% if tool_variants %}
+  <h2>How long it lasts, by material</h2>
+  <div class="panel">
+    <table><thead><tr><th>material</th><th class="num">damage</th><th class="num">crafts</th></tr></thead>
+    <tbody>
+    {% for v in tool_variants %}
+      <tr><td>{{ v.tool_material }}</td><td class="num">{{ "{:,}".format(v.max_damage) }}</td>
+          <td class="num">{{ v.max_damage // 400 if 'hammer' in v.name.lower() or 'file' in v.name.lower() or 'screwdriver' in v.name.lower() else (v.max_damage // 200 if 'saw' in v.name.lower() else v.max_damage // 100) }}</td></tr>
+    {% endfor %}
+    </tbody></table>
+    <p class="tiny muted">Crafts is durability divided by the damage one craft
+      does. That damage is not in the pack data, so it is assumed: 400 for a
+      hammer, file or screwdriver, 200 for a saw, 100 for a crowbar.</p>
+  </div>
+  {% endif %}
+
+  {% if plans %}
+  <h2>Plans that make this</h2>
+  <div class="panel">
+    {% for p in plans %}<div><a href="{{ url_for('plan_view', pid=p.id) }}">{{ p.name }}</a></div>{% endfor %}
+  </div>
+  {% endif %}
+</div>
+
+<div>
+  <h2>{{ choices|length }} {{ plural(choices|length, 'recipe') }} {{ plural(choices|length, 'makes', 'make') }} it</h2>
+  {% for c in choices[:40] %}
+    <div class="card {{ 'gated' if c.gated else '' }}">
+      <h3>{{ m.machine_badge(c.recipe) }} makes {{ c.qty }}
+        {% if c.chanced %}<span class="badge chance">{{ (c.chance*100)|round(1) }}%</span>{% endif %}</h3>
+      <div class="slotgrid">
+        {% for s in c.recipe.slots %}
+          <div class="slot">
+            {% set mo = obj(s.members[0][0]) %}
+            {{ m.thing(mo, 'sm', false) }}<span class="x">&times;{{ s.members[0][1] or 1 }}{{ unit(s.members[0][0]) }}</span>
+            {% if s.set_valued %}<span class="badge">{{ s.tag or 'any of %d'|format(s.members|length) }}</span>{% endif %}
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  {% else %}
+    <div class="note">No recipe in the pack data makes this. You mine it, gather
+      it or buy it.</div>
+  {% endfor %}
+  {% if choices|length > 40 %}<p class="muted small">&hellip; and {{ choices|length - 40 }} more.</p>{% endif %}
+</div>
+</div>
+{% endblock %}

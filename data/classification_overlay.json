@@ -1,0 +1,155 @@
+{
+ "entries": {
+  "Railcraft:machine.beta@0": {
+   "form": "tankWall",
+   "material": "Iron",
+   "provenance": "derived-from-name"
+  },
+  "Railcraft:machine.beta@1": {
+   "form": "tankGauge",
+   "material": "Iron",
+   "provenance": "derived-from-name"
+  },
+  "Railcraft:machine.beta@13": {
+   "form": "tankWall",
+   "material": "Steel",
+   "provenance": "derived-from-name"
+  },
+  "Railcraft:machine.beta@14": {
+   "form": "tankGauge",
+   "material": "Steel",
+   "provenance": "derived-from-name"
+  },
+  "Railcraft:machine.beta@15": {
+   "form": "tankValve",
+   "material": "Steel",
+   "provenance": "derived-from-name"
+  },
+  "Railcraft:machine.beta@2": {
+   "form": "tankValve",
+   "material": "Iron",
+   "provenance": "derived-from-name"
+  },
+  "Railcraft:machine.eta@0": {
+   "form": "tankWall",
+   "material": "Iridium",
+   "provenance": "derived-from-name"
+  },
+  "Railcraft:machine.eta@1": {
+   "form": "tankGauge",
+   "material": "Iridium",
+   "provenance": "derived-from-name"
+  },
+  "Railcraft:machine.eta@2": {
+   "form": "tankValve",
+   "material": "Iridium",
+   "provenance": "derived-from-name"
+  },
+  "Railcraft:machine.eta@3": {
+   "form": "tankWall",
+   "material": "Osmium",
+   "provenance": "derived-from-name"
+  },
+  "Railcraft:machine.eta@4": {
+   "form": "tankGauge",
+   "material": "Osmium",
+   "provenance": "derived-from-name"
+  },
+  "Railcraft:machine.eta@5": {
+   "form": "tankValve",
+   "material": "Osmium",
+   "provenance": "derived-from-name"
+  },
+  "Railcraft:machine.eta@6": {
+   "form": "tankWall",
+   "material": "Neutronium",
+   "provenance": "derived-from-name"
+  },
+  "Railcraft:machine.eta@7": {
+   "form": "tankGauge",
+   "material": "Neutronium",
+   "provenance": "derived-from-name"
+  },
+  "Railcraft:machine.eta@8": {
+   "form": "tankValve",
+   "material": "Neutronium",
+   "provenance": "derived-from-name"
+  },
+  "Railcraft:machine.zeta@0": {
+   "form": "tankWall",
+   "material": "Aluminium",
+   "provenance": "derived-from-name"
+  },
+  "Railcraft:machine.zeta@1": {
+   "form": "tankGauge",
+   "material": "Aluminium",
+   "provenance": "derived-from-name"
+  },
+  "Railcraft:machine.zeta@10": {
+   "form": "tankGauge",
+   "material": "TungstenSteel",
+   "provenance": "derived-from-name"
+  },
+  "Railcraft:machine.zeta@11": {
+   "form": "tankValve",
+   "material": "TungstenSteel",
+   "provenance": "derived-from-name"
+  },
+  "Railcraft:machine.zeta@12": {
+   "form": "tankWall",
+   "material": "Palladium",
+   "provenance": "derived-from-name"
+  },
+  "Railcraft:machine.zeta@13": {
+   "form": "tankGauge",
+   "material": "Palladium",
+   "provenance": "derived-from-name"
+  },
+  "Railcraft:machine.zeta@14": {
+   "form": "tankValve",
+   "material": "Palladium",
+   "provenance": "derived-from-name"
+  },
+  "Railcraft:machine.zeta@2": {
+   "form": "tankValve",
+   "material": "Aluminium",
+   "provenance": "derived-from-name"
+  },
+  "Railcraft:machine.zeta@3": {
+   "form": "tankWall",
+   "material": "StainlessSteel",
+   "provenance": "derived-from-name"
+  },
+  "Railcraft:machine.zeta@4": {
+   "form": "tankGauge",
+   "material": "StainlessSteel",
+   "provenance": "derived-from-name"
+  },
+  "Railcraft:machine.zeta@5": {
+   "form": "tankValve",
+   "material": "StainlessSteel",
+   "provenance": "derived-from-name"
+  },
+  "Railcraft:machine.zeta@6": {
+   "form": "tankWall",
+   "material": "Titanium",
+   "provenance": "derived-from-name"
+  },
+  "Railcraft:machine.zeta@7": {
+   "form": "tankGauge",
+   "material": "Titanium",
+   "provenance": "derived-from-name"
+  },
+  "Railcraft:machine.zeta@8": {
+   "form": "tankValve",
+   "material": "Titanium",
+   "provenance": "derived-from-name"
+  },
+  "Railcraft:machine.zeta@9": {
+   "form": "tankWall",
+   "material": "TungstenSteel",
+   "provenance": "derived-from-name"
+  }
+ },
+ "note": "Hand-authored (form, material) for zero-tag items. Keyed by mod:internalName@damage. Rebuild the derived ones with tools/author_overlay.py --write; entries marked provenance:user are preserved."
+}

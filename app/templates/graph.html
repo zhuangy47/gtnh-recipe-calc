@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m with context %}
+{% block title %}{{ plan.name }} &mdash; route graph{% endblock %}
+{% block body %}
+
+{# The same rows as the list view, positioned instead of indented.  Nothing is
+   derived here that the list does not derive: identical `tree_rows` output,
+   identical node ids, identical buttons.  What the drawing adds is shape --
+   which branch is deep, which is one hop from done -- and that is a question
+   about the picture, so the layout is the only thing that lives in JS. #}
+
+<div class="gbar spread">
+  <div class="row wrap">
+    <a class="btn small" href="{{ url_for('plan_view', pid=plan.id) }}">&larr; {{ plan.name }}</a>
+    <span class="tabs" style="margin:0">
+      <a href="{{ url_for('plan_view', pid=plan.id) }}">list</a>
+      <a class="on" href="{{ url_for('plan_graph', pid=plan.id) }}">graph</a>
+      <a href="{{ url_for('plan_steps', pid=plan.id) }}"
+         title="what to make, where, and in what order">build order</a>
+    </span>
+    {% if open_n %}
+      <button class="small" id="gnext" type="button"
+              title="centre the next undecided item">{{ open_n }} undecided &mdash; next &rarr;</button>
+    {% else %}<span class="badge stop">nothing left to decide</span>{% endif %}
+  </div>
+  <div class="row wrap small">
+    {{ m.units_toggle() }}
+    <label class="muted" for="gdepth">depth</label>
+    <select id="gdepth" title="fold everything below this depth away">
+      <option value="-1">all</option>
+      {% for d in range(1, max_depth + 1) %}<option value="{{ d }}">{{ d }}</option>{% endfor %}
+    </select>
+    <button class="small" id="gexpand" type="button">expand all</button>
+    <button class="small" id="gfit" type="button" title="scale the whole route into view">fit</button>
+    <button class="small" id="gout" type="button" title="zoom out">&minus;</button>
+    <span class="mono tiny muted" id="gzoom" style="min-width:4ch;text-align:center">100%</span>
+    <button class="small" id="gin" type="button" title="zoom in">+</button>
+  </div>
+</div>
+
+<div class="gview" id="gview" data-pid="{{ plan.id }}">
+  <div class="gpop" id="gpop" hidden></div>
+  <div class="gworld pending" id="gworld">
+    <svg class="gedges" id="gedges" aria-hidden="true"></svg>
+    {% for row in rows %}
+      {% set n = row.node %}
+      <div class="gnode is-{{ row.kind }}" id="{{ n.id }}" data-id="{{ n.id }}"
+           data-parent="{{ n.parent or '' }}" data-depth="{{ row.depth }}"
+           data-kind="{{ row.kind }}"{% if kids.get(n.id) %} data-kids="{{ kids[n.id] }}"{% endif %}>
+        {% if kids.get(n.id) %}
+          <button type="button" class="gtog" title="fold this branch away">&minus;</button>
+        {% endif %}
+        <a class="ghit" draggable="false"
+           href="{{ url_for('node_view', pid=plan.id, nid=n.id, back='graph') }}"
+           title="{{ row.obj.name if row.obj else 'unknown item' }}{% if row.obj %} &middot; {{ row.obj.gid }}{% endif %}&#10;{{ qty(row.demand, n.ix) }}{{ unit(n.ix) }}{% if stack_note(row.demand, n.ix) %} ({{ stack_note(row.demand, n.ix) }}){% endif %}{% if exact(row.demand) %} (exactly {{ exact(row.demand) }}){% endif %}{% if row.uses %} &middot; {{ qty(row.uses) }} {{ plural(row.uses, 'use') }}{% endif %}{% if row.kind == 'recipe' and row.recipe %}&#10;{{ row.recipe.name }}{% elif row.kind == 'stop' %}&#10;final &mdash; you obtain this rather than make it{% elif row.kind == 'open' %}&#10;undecided{% endif %}{% if row.note %}&#10;{{ row.note }}{% endif %}&#10;click to choose or change">
+          <span class="gline">
+            <img class="icon sm" src="{{ url_for('icon', ix=n.ix) }}" alt=""
+                 width="22" height="22" loading="lazy" decoding="async">
+            <span class="gname trunc">{{ row.obj.name if row.obj else '(unknown)' }}</span>
+          </span>
+          <span class="gline gsub">
+            <span class="q">{{ qty(row.demand, n.ix) }}<span class="tiny muted">{{ unit(n.ix) }}</span></span>
+            {% if row.kind == 'recipe' and row.recipe %}
+              <span class="badge recipe trunc">{{ row.recipe.name }}</span>
+            {% elif row.kind == 'stop' %}
+              <span class="badge stop">final</span>
+            {% elif row.kind == 'plan' %}
+              <span class="badge recipe trunc">{{ row.note }}</span>
+            {% else %}
+              <span class="badge open trunc">{{ row.note or 'choose' }}</span>
+            {% endif %}
+            {% if row.designation and row.designation.kind != 'consumed' %}
+              <span class="badge tool">{{ row.designation.kind }}</span>{% endif %}
+            {% if n.choice.auto %}<span class="badge">copied</span>{% endif %}
+            {% if row.snode and row.snode.looped %}<span class="badge">loops</span>{% endif %}
+          </span>
+        </a>
+        {% if row.kind == 'open' %}
+          {# The same plan-wide `final` the list view puts on a row, for the
+             same reason: it is the commonest thing to do here and it needs no
+             context from the node page. #}
+          <form class="gact" method="post" action="{{ url_for('stop_node', pid=plan.id, nid=n.id) }}">
+            <input type="hidden" name="back" value="graph">
+            <button class="small" title="buy or mine {{ row.obj.name if row.obj else 'this' }} instead of making it &mdash; everywhere in this plan">final</button>
+          </form>
+        {% endif %}
+        <span class="ghid tiny muted" hidden></span>
+      </div>
+    {% endfor %}
+  </div>
+  {% if not rows %}
+    <div class="gempty muted">Nothing to draw yet &mdash;
+      <a href="{{ url_for('plan_view', pid=plan.id) }}">add an item</a> first.</div>
+  {% endif %}
+</div>
+
+<p class="tiny muted" style="margin-top:8px">Drag to pan, <b>ctrl+wheel</b> to
+  zoom, wheel to scroll; click a box to change its recipe without leaving the
+  drawing, or the &minus; on its left to fold the branch away. The colours mean the
+  same as in the list: a box marked <span class="badge open">choose</span> is still
+  to decide, <span class="badge stop">final</span> is something you obtain rather
+  than make, and a recipe box shows the machine. <b>The boxes down the right-hand
+  edge are your shopping list</b> &mdash; anything with nothing after it is
+  something you have to obtain. Quantities are the same as the list's, so a
+  fraction still means a share of a shared run. Folding changes the picture only:
+  it does not touch the plan. The depth you pick lasts until you close the tab.</p>
+
+{% endblock %}
+
+{% block scripts %}
+{# app.js for the icon that follows a set-valued slot's select: the choice panel
+   renders the same slot markup the node page does. #}
+<script src="{{ url_for('static', filename='app.js') }}"></script>
+<script src="{{ url_for('static', filename='graph.js') }}"></script>
+{% endblock %}

@@ -1,0 +1,10 @@
+{% for o in hits %}
+<button type="button" data-ix="{{ o.ix }}" data-name="{{ o.name }}" data-gid="{{ o.gid }}">
+  <img class="icon sm" src="{{ url_for('icon', ix=o.ix) }}" alt=""
+       width="22" height="22" loading="lazy" decoding="async">
+  <span class="nm trunc">{{ o.name }}
+    <span class="gid tiny muted">{{ o.gid }}{% if o.label %} &middot; {{ o.label }}{% endif %}</span></span>
+</button>
+{% else %}
+<div class="small muted" style="padding:8px">nothing matches</div>
+{% endfor %}

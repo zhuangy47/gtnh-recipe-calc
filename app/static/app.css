@@ -1,0 +1,432 @@
+:root {
+  --bg: #14161a;
+  --panel: #1b1e24;
+  --panel2: #20242b;
+  --line: #2e343e;
+  --ink: #dfe3ea;
+  --dim: #949cab;
+  --accent: #7cc0ff;
+  --good: #7ad19a;
+  --warn: #f0c674;
+  --bad: #f08a7a;
+  --open: #f0c674;
+  /* the halo on a step you can start now -- an alpha of --open, written out
+     because a custom property cannot be given one */
+  --glow: rgba(240, 198, 116, .18);
+}
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #f6f7f9; --panel: #ffffff; --panel2: #f0f2f5; --line: #d8dde5;
+    --ink: #1b2029; --dim: #5d6675; --accent: #1668c4; --good: #1a7f4b;
+    --warn: #9a6b00; --bad: #b03a26; --open: #9a6b00;
+    --glow: rgba(154, 107, 0, .16);
+  }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  background: var(--bg); color: var(--ink);
+  font: 14px/1.45 "Segoe UI", system-ui, -apple-system, sans-serif;
+}
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+code, .gid, .mono { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; }
+
+header.top {
+  display: flex; align-items: center; gap: 18px; padding: 10px 18px;
+  border-bottom: 1px solid var(--line); background: var(--panel);
+  position: sticky; top: 0; z-index: 20;
+}
+.brand { font-weight: 700; letter-spacing: .02em; color: var(--ink); }
+header.top nav { display: flex; gap: 14px; }
+header.top .muted { margin-left: auto; }
+main { padding: 18px; max-width: 1720px; margin: 0 auto; }
+footer { padding: 22px 18px 40px; max-width: 1100px; margin: 0 auto; }
+
+.muted { color: var(--dim); }
+.small { font-size: 12px; }
+.tiny { font-size: 11px; }
+h1 { font-size: 20px; margin: 0 0 4px; }
+h2 { font-size: 15px; margin: 22px 0 8px; text-transform: uppercase;
+     letter-spacing: .08em; color: var(--dim); }
+h3 { font-size: 14px; margin: 0 0 6px; }
+
+.panel { background: var(--panel); border: 1px solid var(--line);
+         border-radius: 8px; padding: 14px; }
+.cols { display: grid; grid-template-columns: minmax(0,1.15fr) minmax(0,1fr);
+        gap: 18px; align-items: start; }
+@media (max-width: 1100px) { .cols { grid-template-columns: 1fr; } }
+.row { display: flex; align-items: center; gap: 8px; }
+.wrap { flex-wrap: wrap; }
+.spread { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.stack { display: flex; flex-direction: column; gap: 10px; }
+
+button, .btn {
+  font: inherit; cursor: pointer; border: 1px solid var(--line);
+  background: var(--panel2); color: var(--ink); border-radius: 6px;
+  padding: 5px 10px; display: inline-block;
+}
+button:hover, .btn:hover { border-color: var(--accent); text-decoration: none; }
+button.primary, .btn.primary { background: var(--accent); border-color: var(--accent); color: #06121f; font-weight: 600; }
+button.ghost { background: transparent; }
+button.danger:hover { border-color: var(--bad); color: var(--bad); }
+.btn.small, button.small { padding: 2px 7px; font-size: 12px; }
+input[type=text], input[type=number], input[type=search], select, textarea {
+  font: inherit; background: var(--bg); color: var(--ink);
+  border: 1px solid var(--line); border-radius: 6px; padding: 5px 8px;
+}
+input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+input[type=number] { width: 90px; }
+form.inline { display: inline-flex; gap: 6px; align-items: center; }
+
+img.icon { width: 32px; height: 32px; image-rendering: pixelated;
+           background: var(--panel2); border-radius: 4px; flex: none; }
+img.icon.sm { width: 22px; height: 22px; }
+img.icon.lg { width: 48px; height: 48px; }
+
+.badge { font-size: 11px; padding: 1px 7px; border-radius: 99px;
+         border: 1px solid var(--line); color: var(--dim); white-space: nowrap; }
+.badge.open { color: var(--open); border-color: var(--open); }
+.badge.stop { color: var(--good); border-color: var(--good); }
+.badge.recipe { color: var(--accent); border-color: var(--accent); }
+.badge.gated { color: var(--bad); border-color: var(--bad); }
+.badge.chance { color: var(--warn); border-color: var(--warn); }
+.badge.tool { color: var(--warn); border-color: var(--warn); }
+.badge.plain { }
+/* Two badges the build order needs that are *not* states, and must not borrow a
+   state's colour.  `goal` marks the thing the plan exists to make -- it is
+   identity, not status, and it wore --good until that also meant "done", so a
+   goal you had not built yet was painted the colour of finished.  `short` is the
+   one badge on that page you have to act on: you ticked a step and the plan now
+   wants more of it, which is the only way to think you are finished when you are
+   not.  A loop, by contrast, is a legitimate route this model walks rather than
+   cuts, so it is a plain badge with an explanation and no alarm colour at all. */
+.badge.goal { color: var(--ink); border-color: var(--dim); }
+.badge.short { color: var(--bad); border-color: var(--bad); }
+
+table { border-collapse: collapse; width: 100%; }
+th, td { text-align: left; padding: 5px 8px; border-bottom: 1px solid var(--line);
+         vertical-align: middle; }
+th { color: var(--dim); font-weight: 600; font-size: 12px;
+     text-transform: uppercase; letter-spacing: .05em; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+tbody tr:hover { background: var(--panel2); }
+
+/* --- the route tree ---------------------------------------------------- */
+.tree { display: flex; flex-direction: column; }
+.tnode {
+  display: flex; align-items: center; gap: 8px; padding: 5px 6px;
+  border-bottom: 1px solid var(--line); border-left: 3px solid transparent;
+}
+.tnode:hover { background: var(--panel2); }
+.tnode.is-open { border-left-color: var(--open); }
+.tnode.is-recipe { border-left-color: transparent; }
+.tnode.is-stop { border-left-color: var(--good); }
+.tnode .indent { flex: none; }
+.tnode .nm { min-width: 0; }
+.tnode .nm b { font-weight: 600; }
+.tnode .grow { flex: 1 1 auto; min-width: 0; }
+.tnode .q { font-variant-numeric: tabular-nums; font-weight: 700; white-space: nowrap; }
+.tnode .acts { display: flex; gap: 6px; flex: none; }
+.trunk { color: var(--line); }
+
+.tabs { display: flex; gap: 6px; margin-bottom: 10px; flex-wrap: wrap; }
+.tabs a { padding: 4px 10px; border: 1px solid var(--line); border-radius: 99px;
+          color: var(--dim); }
+.tabs a.on { color: var(--ink); border-color: var(--accent); background: var(--panel2); }
+/* The counts/stacks switch is a form, so its tabs are buttons -- same pills,
+   and no JavaScript, because it has to work on the build order's list view. */
+.tabs button { padding: 4px 10px; border-radius: 99px; background: transparent;
+               color: var(--dim); }
+.tabs button.on { color: var(--ink); border-color: var(--accent);
+                  background: var(--panel2); }
+
+/* A quantity in a numeric table cell.  "2 stacks + 22" is a phrase, not a
+   number, so it is kept on one line and the column widens for it. */
+.qb { font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* "500 mB", not "500mB": the unit is set small and grey, which is not on its
+   own enough of a gap to read as a separate word. */
+.q > .tiny, .qb > .tiny { margin-left: 2px; }
+.qb.strong { font-weight: 700; }
+
+.card { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px;
+        background: var(--panel2); margin-bottom: 10px; }
+.card.gated { opacity: .72; border-style: dashed; }
+.card h3 { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.slotgrid { display: flex; flex-wrap: wrap; gap: 10px; margin: 8px 0; }
+.slot { display: flex; align-items: center; gap: 6px; padding: 4px 6px;
+        border: 1px solid var(--line); border-radius: 6px; background: var(--panel); }
+.slot .x { color: var(--dim); font-variant-numeric: tabular-nums; }
+.arrow { color: var(--dim); align-self: center; }
+
+.note { border-left: 3px solid var(--accent); background: var(--panel2);
+        padding: 8px 12px; border-radius: 0 6px 6px 0; margin: 10px 0; }
+.note.warn { border-left-color: var(--warn); }
+.note.bad { border-left-color: var(--bad); }
+ul.warnings { list-style: none; padding: 0; margin: 0; }
+ul.warnings li { padding: 6px 10px; border-left: 3px solid var(--warn);
+                 background: var(--panel2); margin-bottom: 6px; border-radius: 0 6px 6px 0; }
+ul.warnings li.bad { border-left-color: var(--bad); }
+
+.searchbox { position: relative; }
+.results { border: 1px solid var(--line); border-radius: 8px; margin-top: 6px;
+           max-height: 340px; overflow: auto; background: var(--panel); }
+.results:empty { display: none; }
+.results button { display: flex; width: 100%; text-align: left; gap: 8px;
+                  align-items: center; border: 0; border-bottom: 1px solid var(--line);
+                  border-radius: 0; background: transparent; padding: 6px 8px; }
+.results button:hover { background: var(--panel2); }
+
+details > summary { cursor: pointer; color: var(--dim); padding: 4px 0; }
+details[open] > summary { color: var(--ink); }
+.kv { display: grid; grid-template-columns: max-content 1fr; gap: 2px 12px; }
+.kv dt { color: var(--dim); }
+.kv dd { margin: 0; }
+.pill-list { display: flex; gap: 6px; flex-wrap: wrap; }
+.hr { height: 1px; background: var(--line); margin: 14px 0; }
+.right { margin-left: auto; }
+/* Used inside .tnode and .rawrow long before the panel wanted it; those keep
+   their own rules, this makes the class mean the same thing anywhere. */
+.grow { flex: 1 1 auto; min-width: 0; }
+.nowrap { white-space: nowrap; }
+.trunc { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* The raw-materials view: one <details> per leaf, so "what is eating this"
+   opens without a round trip and without any JavaScript. */
+.rawrow { border-bottom: 1px solid var(--line); }
+.rawrow > summary { padding: 6px 4px; list-style-position: outside; }
+.rawrow > summary::marker { color: var(--dim); }
+.rawrow > summary:hover { background: var(--panel2); }
+.rawrow .q { font-variant-numeric: tabular-nums; font-weight: 700; white-space: nowrap; }
+.rawrow .grow { flex: 1 1 auto; min-width: 0; }
+.rawrow .into { padding: 4px 0 10px 26px; border-left: 2px solid var(--line); margin-left: 8px; }
+.rawrow .into .row { padding: 3px 0; }
+.rawrow .into .q { min-width: 5ch; text-align: right; color: var(--dim); }
+
+/* --- the route, drawn (graph.js positions .gnode; see graph.html) --------
+   The box is a fixed size on purpose: the layout is "x is depth, y is leaf
+   order", and that is only arithmetic while every row is the same height. */
+.gbar { margin-bottom: 10px; }
+/* Not selectable: a pan that runs past the edge of the canvas otherwise paints
+   a selection across every box it passed, and a press on that selection is the
+   browser's cue to drag the text somewhere -- which takes the pointer away
+   from the pan.  See the dragstart handler in graph.js for the other half. */
+.gview {
+  position: relative; overflow: hidden; height: calc(100vh - 230px);
+  min-height: 420px; border: 1px solid var(--line); border-radius: 8px;
+  background: var(--panel); cursor: grab; touch-action: none;
+  user-select: none; -webkit-user-select: none;
+}
+.gview.dragging { cursor: grabbing; }
+.gworld { position: absolute; top: 0; left: 0; transform-origin: 0 0; }
+.gworld.pending { visibility: hidden; }
+.gedges { position: absolute; top: 0; left: 0; pointer-events: none; overflow: visible; }
+.gedges path { fill: none; stroke: var(--line); stroke-width: 1.6px; }
+.gedges path.lit { stroke: var(--accent); stroke-width: 2.4px; }
+.gempty { position: absolute; inset: 0; display: flex; align-items: center;
+          justify-content: center; }
+
+.gnode {
+  position: absolute; top: 0; left: 0; width: 250px; height: 46px;
+  display: flex; align-items: stretch; gap: 4px; padding: 0 6px 0 0;
+  background: var(--panel2); border: 1px solid var(--line);
+  border-left: 3px solid var(--line); border-radius: 7px;
+}
+.gnode.is-open { border-left-color: var(--open); }
+.gnode.is-stop { border-left-color: var(--good); }
+.gnode.is-recipe { border-left-color: var(--accent); }
+.gnode.lit { border-color: var(--accent); background: var(--panel); }
+.gnode.flash { outline: 2px solid var(--accent); outline-offset: 2px; }
+.gnode .ghit { flex: 1 1 auto; min-width: 0; display: flex;
+               flex-direction: column; justify-content: center; gap: 1px;
+               color: var(--ink); padding: 0 2px; cursor: pointer; }
+.gnode .ghit:hover { text-decoration: none; }
+.gnode .ghit:hover .gname { color: var(--accent); }
+.gnode .gline { display: flex; align-items: center; gap: 6px;
+                min-width: 0; overflow: hidden; }
+.gnode .gname { font-size: 13px; font-weight: 600; flex: 1 1 auto; min-width: 0; }
+.gnode .gsub { font-size: 11px; color: var(--dim); }
+.gnode .gsub .q { font-variant-numeric: tabular-nums; font-weight: 700;
+                  color: var(--ink); white-space: nowrap; }
+.gnode .gsub .badge { max-width: 130px; overflow: hidden;
+                      text-overflow: ellipsis; }
+.gnode .gtog {
+  flex: none; width: 18px; padding: 0; border: 0; border-right: 1px solid var(--line);
+  border-radius: 0; background: transparent; color: var(--dim);
+  font-size: 13px; line-height: 1;
+}
+.gnode .gtog:hover { color: var(--accent); background: var(--panel); }
+.gnode.folded { border-style: dashed; }
+/* Always there, never on hover: revealing it on hover reflows the box, and a
+   click aimed at the link lands in the gap the button just opened.  The list
+   view shows `final` on every open row too, so this matches it. */
+.gnode .gact { align-self: center; flex: none; }
+.gnode .ghid { align-self: center; flex: none; font-variant-numeric: tabular-nums; }
+
+/* The in-place recipe picker.  It lives in .gview but outside .gworld, so it
+   is drawn in screen space and stays legible at any zoom -- and its text is
+   selectable again, because it is something to read and copy from rather than
+   canvas to drag across. */
+.gpop {
+  position: absolute; z-index: 5; width: 430px; max-width: calc(100% - 16px);
+  max-height: calc(100% - 16px); display: flex; flex-direction: column;
+  background: var(--panel); border: 1px solid var(--accent); border-radius: 9px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, .45);
+}
+.gpop, .gpop * { user-select: text; -webkit-user-select: text; }
+.gpop[hidden] { display: none; }
+.gpop-head { padding: 8px 10px; border-bottom: 1px solid var(--line); }
+.gpop-head .tabs { flex-wrap: wrap; }
+.gpop-head .tabs a { padding: 1px 8px; }
+/* `contain`, so that running off the end of the recipe list does not then
+   scroll the page behind the panel by the few pixels it has to give.  The
+   drawing itself never scrolls -- graph.js prevents that wheel -- so the
+   creep would be the document, not the canvas, which is stranger still. */
+.gpop-body { overflow: auto; overscroll-behavior: contain;
+             padding: 8px 10px; flex: 1 1 auto; }
+.gpop-foot { padding: 6px 10px; border-top: 1px solid var(--line); gap: 8px; }
+.gpop-card { margin-bottom: 6px; padding: 7px 8px; }
+.gpop-card:last-child { margin-bottom: 0; }
+.gpop-card.on { border-color: var(--accent); }
+.gpop-card .slotgrid { gap: 5px; }
+.gpop-card .slot { padding: 2px 5px; }
+.gpop-card select { padding: 1px 4px; max-width: 190px; }
+.gpop-wait { padding: 14px; }
+.gnode.picking { border-color: var(--accent); }
+
+/* --- the build order (steps.js positions .snode; see steps.html) ---------
+   Two shapes of the same list.  The drawing borrows .gview, .gworld, .gedges
+   and .gpop wholesale -- it is the same camera over a different layout -- and
+   only the box and the column heading are its own.  A step box is a fixed
+   size for the same reason a route box is: the layout is arithmetic. */
+/* The build order carries one bar the route graph does not, so the drawing
+   gets correspondingly less room; without this the legend below it is always
+   just off the bottom of the window. */
+#sview { height: calc(100vh - 290px); }
+.sprog { padding: 8px 12px; margin-bottom: 10px; }
+.sprog b { font-variant-numeric: tabular-nums; }
+.sbar { height: 5px; border-radius: 99px; background: var(--panel2);
+        margin-top: 7px; overflow: hidden; }
+.sbar span { display: block; height: 100%; background: var(--good);
+             transition: width .18s ease; }
+
+.scolhead {
+  position: absolute; top: 0; left: 0; width: 280px;
+  display: flex; align-items: baseline; gap: 8px; padding: 0 4px 4px;
+  border-bottom: 1px solid var(--line);
+}
+.scolhead b { font-size: 15px; }
+
+.snode {
+  position: absolute; top: 0; left: 0; width: 280px; height: 52px;
+  display: flex; align-items: stretch; gap: 4px; padding: 0 6px 0 0;
+  background: var(--panel2); border: 1px solid var(--line);
+  border-left: 3px solid var(--line); border-radius: 7px;
+}
+/* The three states, and they are the whole point of the view: lit means you
+   have everything it needs *right now*, dim means something above it is not
+   done yet, and a tick is a tick.  Colour alone would not do it -- the ready
+   box is also the only one that is fully opaque. */
+/* Ready is --open, the colour this app already uses for outstanding work --
+   the same amber as the "you can do now" chip above the drawing, and as the
+   route's undecided rows.  It must not be --accent: that is the colour of
+   *pointing at* something, so a hovered box two columns downstream read as a
+   step you could start. */
+.snode.is-ready { border-color: var(--open); border-left-color: var(--open);
+                  background: var(--panel); box-shadow: 0 0 0 3px var(--glow); }
+.snode.is-blocked { opacity: .48; }
+.snode.is-done { opacity: .6; border-left-color: var(--good); }
+.snode.is-done .gname { text-decoration: line-through; }
+.snode.kind-obtain { border-style: dashed; }
+/* Hover is a **ring**, not a border.  Recolouring the border was the mistake:
+   the border and the halo are how a box says whether you can start it, so
+   pointing at a step you could do turned it into something that looked like a
+   step you could not.  An outline sits outside all of that and takes nothing
+   away.
+
+   The other half is subtraction.  Three lit edges among a hundred and fifty are
+   not findable however brightly they are drawn, so everything outside the
+   neighbourhood fades and the answer is the only thing left on the canvas.  The
+   fade is one class on the world, so the browser does the work rather than 79
+   inline styles. */
+#sworld.hovering .snode:not(.lit):not(.picking) { opacity: .16; }
+.snode.lit { opacity: 1; outline: 2px solid var(--accent); outline-offset: 2px; }
+/* And the box actually under the pointer, told apart from what it is joined to:
+   --ink is not a hue and so cannot be read as a state. */
+.snode.hot { outline: 2px solid var(--ink); outline-offset: 2px; }
+.snode.flash { outline: 2px solid var(--accent); outline-offset: 4px; }
+.snode .shit { flex: 1 1 auto; min-width: 0; display: flex;
+               flex-direction: column; justify-content: center; gap: 1px;
+               color: var(--ink); padding: 0 2px; cursor: pointer; }
+.snode .shit:hover .gname { color: var(--accent); }
+.snode .gsub .q { font-variant-numeric: tabular-nums; font-weight: 700;
+                  color: var(--ink); white-space: nowrap; }
+/* The box is a fixed height, so the second line must not wrap out of it.  It
+   never did while every amount was a bare number; "6 stacks + 32" is longer,
+   and the honest fix is the one the route box already uses -- the quantity and
+   the run count stay whole, and the machine badge gives up its tail. */
+.snode .gsub { display: flex; align-items: center; gap: 6px;
+               min-width: 0; overflow: hidden; }
+.snode .gsub > * { flex: none; }
+.snode .gsub .badge { flex: 0 1 auto; min-width: 0; overflow: hidden;
+                      white-space: nowrap; text-overflow: ellipsis; }
+/* Except the shortfall flag, which is also a badge: "15 stacks + 40 more" is
+   the whole reason the box is lit, and the machine name is on the row twice. */
+.snode .gsub .sflag { flex: none; }
+.snode.picking { border-color: var(--accent); }
+#sedges path.done { stroke: var(--good); opacity: .5; }
+/* Same subtraction for the arrows, and `.lit` has to out-specify both the
+   done-edge green and the fade -- an edge from a step you have finished is
+   exactly the one you are most likely to be tracing. */
+#sworld.hovering #sedges path { opacity: .07; }
+#sedges path.lit,
+#sworld.hovering #sedges path.lit { stroke: var(--accent); stroke-width: 3px;
+                                    opacity: 1; }
+
+/* The tick.  Big enough to hit at a glance down a column, and the same
+   control in both shapes so muscle memory carries over. */
+.stick { flex: none; display: flex; align-items: stretch; }
+.tickbtn {
+  width: 26px; padding: 0; border-radius: 6px 0 0 6px; border: 0;
+  border-right: 1px solid var(--line); background: transparent;
+  color: var(--good); font-size: 15px; line-height: 1;
+}
+.tickbtn:hover { background: var(--panel); color: var(--accent); }
+/* An empty box, drawn.  Without it the control in the drawing is a blank
+   26 pixels and nobody discovers it -- the list row reads as a checkbox
+   because it has a border of its own, and the drawing has to say the same
+   thing in the same place. */
+.snode .tickbtn::before {
+  content: ""; display: block; margin: auto; width: 13px; height: 13px;
+  border: 1.5px solid var(--dim); border-radius: 3px;
+}
+.snode .tickbtn:hover::before { border-color: var(--good); }
+.snode.is-done .tickbtn::before { display: none; }
+.srow .tickbtn { height: 22px; width: 22px; border: 1px solid var(--line);
+                 border-radius: 5px; }
+.is-done .tickbtn { color: var(--good); }
+.is-ready .tickbtn { color: var(--dim); }
+.is-ready .tickbtn:hover { color: var(--good); }
+
+/* The list.  Same rows, same ticks, no JavaScript needed -- it is what you
+   read while you play, and what prints. */
+.sstage { margin: 18px 0 6px; }
+.srow { border-bottom: 1px solid var(--line); }
+.srow:last-child { border-bottom: 0; }
+.srow > summary { padding: 5px 8px; list-style-position: outside; cursor: pointer; }
+.srow > summary::marker { color: var(--dim); }
+.srow > summary:hover { background: var(--panel2); }
+.srow > summary .row { display: inline-flex; width: calc(100% - 18px);
+                       vertical-align: middle; }
+.srow .q { font-variant-numeric: tabular-nums; font-weight: 700; white-space: nowrap; }
+.srow.is-ready > summary { border-left: 3px solid var(--open);
+                           background: var(--panel2); }
+.srow.is-blocked { opacity: .55; }
+.srow.is-done .nm a { text-decoration: line-through; }
+.srow.is-done { opacity: .7; }
+.sdet { padding: 4px 10px 12px 34px; }
+.sneed .row { padding: 2px 0; }
+.sneed .q { min-width: 6ch; text-align: right; color: var(--dim); }
+.sgoto { white-space: nowrap; }
+.srow.flash > summary { outline: 2px solid var(--accent); outline-offset: -2px; }
+.gpop .sdet { padding: 0; }

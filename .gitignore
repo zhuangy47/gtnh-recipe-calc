@@ -1,0 +1,23 @@
+# Notes for Claude, not for anyone running this.
+docs/
+plans/*
+
+# Only the converter ships: `gtnh_cost.bootstrap` shells out to it on a fresh
+# clone to build data/nesql.sqlite.  Everything else in here is authoring and
+# self-test tooling that an end user never runs.
+# (`tools/*`, not `tools/` -- git does not descend into an ignored directory,
+# so a negation inside one never matches.)
+tools/*
+!tools/nesql_to_sqlite.py
+
+# Derived from the two xz archives that *are* committed.  See bootstrap.py.
+data/nesql.sqlite
+data/nesql-db.script
+data/image.zip
+data/cache/
+*.part
+
+node_modules/
+
+__pycache__/
+*.py[cod]

@@ -1,0 +1,132 @@
+{% import "_macros.html" as m with context %}
+{# The choice list, small enough to sit on top of the drawing.
+
+   Every form here posts to the ordinary `choose_recipe` route with
+   `back=graph`, so choosing in the panel is the same decision, taken the same
+   way, landing back on the node you were looking at.  The set-valued slots keep
+   their selects: dropping them would quietly choose a default member where the
+   node page would have asked, and a picker that decides things for you is worse
+   than no picker. #}
+
+<div class="gpop-head">
+  <div class="row">
+    {{ m.thing(it, 'sm', false) }}
+    <span class="grow"></span>
+    <span class="tiny muted nowrap">{{ qty(demand, node.ix) }}{{ unit(node.ix) }} needed</span>
+    <a class="btn small" href="{{ url_for('node_view', pid=plan.id, nid=node.id, back='graph') }}"
+       title="tool material, what happens to the item, using another plan">more options &rarr;</a>
+    <button type="button" class="btn small gpop-close" title="close (Esc)">&times;</button>
+  </div>
+
+  <div class="row wrap tiny" style="margin-top:6px">
+    <span class="muted">{{ n_choices }} {{ plural(n_choices, 'recipe') }}
+      {{ plural(n_choices, 'makes', 'make') }} this{% if q or only %},
+      {{ n_unfiltered }} before filtering{% endif %}</span>
+  </div>
+
+  {% if n_unfiltered > 3 or q or only %}
+  <div class="row wrap" style="margin-top:6px">
+    <input type="search" class="gpop-q small" value="{{ q }}" style="flex:1;min-width:120px"
+           placeholder="filter by an input &mdash; plank, dust, molten tin &hellip;"
+           title="matches any item a slot will accept, not just the one shown">
+    {% if q %}<button type="button" class="small gpop-filter" data-q="">clear</button>{% endif %}
+  </div>
+  {% endif %}
+
+  {% if groups|length > 1 %}
+  <div class="tabs tiny" style="margin:6px 0 0">
+    <a class="{{ 'on' if not only else '' }}" href="#" data-map="">all {{ n_choices }}</a>
+    {% for g in groups %}
+      <a class="{{ 'on' if only == g.map else '' }}" href="#" data-map="{{ g.map }}">{{ g.name }} ({{ g.n }})</a>
+    {% endfor %}
+  </div>
+  {% endif %}
+</div>
+
+<div class="gpop-body">
+  {% for c in choices %}
+    {% set r = c.recipe %}
+    {% set chosen = node.choice.kind == 'recipe' and node.choice.recipe == r.rid %}
+    <form class="card gpop-card {{ 'gated' if c.gated else '' }} {{ 'on' if chosen else '' }}"
+          method="post" action="{{ url_for('choose_recipe', pid=plan.id, nid=node.id) }}">
+      <input type="hidden" name="back" value="graph">
+      <input type="hidden" name="recipe" value="{{ r.rid }}">
+      <div class="row wrap" style="gap:6px">
+        {{ m.machine_badge(r) }}
+        <span class="tiny muted nowrap">makes <b>{{ c.qty }}</b>{{ unit(node.ix) }}</span>
+        {% if c.chanced %}<span class="badge chance" title="an average, not a guarantee">{{ (c.chance*100)|round(1) }}%</span>{% endif %}
+        {% if c.gated %}<span class="badge gated" title="{{ c.reason }}">gated</span>{% endif %}
+        <span class="grow"></span>
+        {% if chosen %}<span class="badge recipe">chosen</span>{% endif %}
+        {# The chosen recipe keeps its button: the slot picks below are part of
+           the decision, and changing one has to be submittable. #}
+        <button class="{{ '' if chosen else 'primary' }} small" type="submit">{{
+          're-apply' if chosen else 'use this' }}</button>
+      </div>
+      <div class="slotgrid" style="margin:6px 0 0">
+        {% for s in r.slots %}
+          {% set pick = node.choice.picks.get(s.key|string) if node.choice.kind == 'recipe' else None %}
+          <div class="slot">
+            {% if s.set_valued %}
+              {# An <option> cannot carry a picture, so the icon sits beside the
+                 select and follows it -- otherwise a substitutable slot is the
+                 one place in the app where you choose an item unseen. #}
+              {% set cur = pick if pick and pick in s.members|map(attribute=0) else s.members[0][0] %}
+              {% set co = obj(cur) %}
+              <img class="icon sm js-pic" src="{{ url_for('icon', ix=cur) }}" alt=""
+                   width="22" height="22" loading="lazy" decoding="async"
+                   title="{{ co.name if co else cur }}">
+              <select name="pick:{{ s.key }}" class="tiny js-picker"
+                      title="{{ s.tag or 'this slot accepts any of these' }}">
+                {% for mix, mq in s.members %}
+                  {% set mo = obj(mix) %}
+                  <option value="{{ mix }}" data-icon="{{ url_for('icon', ix=mix) }}"
+                          data-name="{{ mo.name if mo else mix }}"
+                          {{ 'selected' if pick == mix else '' }}>{{ mo.name if mo else mix }}
+                    &times;{{ mq if mq else 1 }}{{ unit(mix) }}</option>
+                {% endfor %}
+              </select>
+            {% else %}
+              {% set mo = obj(s.members[0][0]) %}
+              <img class="icon sm" src="{{ url_for('icon', ix=s.members[0][0]) }}" alt=""
+                   width="22" height="22" loading="lazy" decoding="async"
+                   title="{{ mo.name if mo else s.members[0][0] }}">
+              <span class="x tiny">&times;{{ s.members[0][1] if s.members[0][1] else 1 }}{{ unit(s.members[0][0]) }}</span>
+              {% if not s.members[0][1] %}<span class="badge tool" title="needed but not used up">kept</span>{% endif %}
+            {% endif %}
+          </div>
+        {% else %}
+          <span class="muted tiny">no inputs recorded</span>
+        {% endfor %}
+      </div>
+    </form>
+  {% else %}
+    <p class="muted small" style="margin:6px 2px">
+      {% if q or only %}No recipe here takes an input matching that{% if only %} on this machine{% endif %}.
+        <a href="#" data-map="" data-q="">Clear the filters</a> to see all {{ n_unfiltered }}.
+      {% else %}No recipe in the pack data makes {{ it.name if it else 'this' }} &mdash;
+        mine it, gather it or buy it.{% if hidden %} ({{ hidden|length }} {{ plural(hidden|length, 'recipe') }} {{ plural(hidden|length, 'needs', 'need') }} it to
+        make it; the full page says why.){% endif %}{% endif %}</p>
+  {% endfor %}
+</div>
+
+<div class="gpop-foot row wrap tiny">
+  {% if n_choices > n_shown %}
+    <span class="muted">showing {{ n_shown }} of {{ n_choices }} &mdash;
+      narrow it above, or open the <a href="{{ url_for('node_view', pid=plan.id, nid=node.id, back='graph') }}">full
+      page</a> to see them all</span>
+  {% endif %}
+  <span class="grow"></span>
+  {% if kind == 'open' %}
+    <form method="post" action="{{ url_for('stop_node', pid=plan.id, nid=node.id) }}">
+      <input type="hidden" name="back" value="graph">
+      <button class="small" title="buy or mine {{ it.name if it else 'this' }} instead of making it &mdash; everywhere in this plan">final instead</button>
+    </form>
+  {% else %}
+    {# The inverse of choosing, next to the choice it undoes. #}
+    <form method="post" action="{{ url_for('open_node', pid=plan.id, nid=node.id) }}">
+      <input type="hidden" name="back" value="graph">
+      <button class="small ghost" title="throw away the decisions below this point{% if it %}, and stop treating {{ it.name }} as final{% endif %}">reopen</button>
+    </form>
+  {% endif %}
+</div>

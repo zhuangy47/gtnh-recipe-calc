@@ -1,0 +1,358 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m with context %}
+{% block title %}{{ plan.name }} &mdash; GTNH cost model{% endblock %}
+{% block body %}
+
+<div class="spread" style="margin-bottom:12px">
+  <form class="inline" method="post" action="{{ url_for('rename_plan', pid=plan.id) }}">
+    <input type="text" name="name" value="{{ plan.name }}" style="font-size:19px;font-weight:700;width:26ch">
+    <button class="small">rename</button>
+  </form>
+  <div class="row wrap small">
+    {% if open_n %}<span class="badge open">{{ open_n }} still to decide</span>
+      <a class="btn small primary" href="{{ url_for('node_view', pid=plan.id, nid=next_open) }}">next undecided &rarr;</a>
+    {% else %}<span class="badge stop">nothing left to decide</span>
+      {# The plan is finished, so the next thing anybody wants is what to
+         actually go and do. #}
+      <a class="btn small primary" href="{{ url_for('plan_steps', pid=plan.id) }}">build it &rarr;</a>
+    {% endif %}
+    <a class="btn small" href="{{ url_for('machines', pid=plan.id) }}">machines
+      {% if plan.machines is none %}(all){% else %}({{ plan.machines|length }}){% endif %}</a>
+    <a class="btn small" href="{{ url_for('repick', pid=plan.id) }}">swap material</a>
+    {{ m.units_toggle() }}
+    <form class="inline" method="post" action="{{ url_for('duplicate_plan', pid=plan.id) }}">
+      <button class="small">duplicate</button></form>
+    <form class="inline" method="post" action="{{ url_for('delete_plan', pid=plan.id) }}"
+          onsubmit="return confirm('Delete this plan?')">
+      <button class="small danger">delete</button></form>
+  </div>
+</div>
+
+<div class="cols">
+
+<!-- ================= the route ================= -->
+<div>
+  <h2>What you are making</h2>
+  <div class="panel">
+    {% for r in plan.roots %}
+      {% set n = plan.nodes.get(r.node) %}
+      {% if n %}
+      <div class="row" style="padding:4px 0;border-bottom:1px solid var(--line)">
+        {{ m.thing(obj(n.ix), 'sm') }}
+        <form class="inline right" method="post" action="{{ url_for('edit_root', pid=plan.id, nid=n.id) }}">
+          <input type="number" name="qty" value="{{ ceil_qty(r.qty) }}" min="1" step="1" style="width:80px">
+          <button class="small">set</button>
+        </form>
+        <form class="inline" method="post" action="{{ url_for('edit_root', pid=plan.id, nid=n.id) }}">
+          <input type="hidden" name="action" value="delete">
+          <button class="small ghost danger" title="Remove this item">&times;</button>
+        </form>
+      </div>
+      {% endif %}
+    {% endfor %}
+    <form class="row wrap" method="post" action="{{ url_for('add_root', pid=plan.id) }}" style="margin-top:10px">
+      <div style="flex:1 1 260px">{{ m.searchbox('ix', 'add another item &mdash; another block of the multiblock, say'|safe) }}</div>
+      <input type="number" name="qty" value="1" min="1" step="1">
+      <button>add item</button>
+    </form>
+  </div>
+
+  <h2 class="spread">Route
+    {# The same walk, drawn.  Both views are the same `tree_rows`, so this is a
+       toggle and not a second model. #}
+    <span class="tabs" style="margin:0;text-transform:none;letter-spacing:normal">
+      <a class="on" href="{{ url_for('plan_view', pid=plan.id, view=view) }}">list</a>
+      <a href="{{ url_for('plan_graph', pid=plan.id) }}">graph</a>
+      {# Not a third drawing of the route: the same decisions read as work to
+         do, batched by machine and ordered by what feeds what. #}
+      <a href="{{ url_for('plan_steps', pid=plan.id) }}"
+         title="what to make, where, and in what order">build order</a>
+    </span>
+  </h2>
+  <div class="panel" style="padding:0">
+    <div class="tree">
+    {% for row in rows %}
+      {% set n = row.node %}
+      <div class="tnode is-{{ row.kind }}" id="{{ n.id }}" style="padding-left:{{ 6 + row.depth * 18 }}px">
+        {{ m.thing(row.obj, 'sm') }}
+        <span class="grow"></span>
+
+        {% if row.designation and row.designation.kind != 'consumed' %}
+          <span class="badge tool" title="{{ row.designation.why }}">{{ row.designation.kind }}</span>
+        {% endif %}
+        {% if row.tool %}<span class="badge" title="how fast it wears out is worked out from this material">{{ row.tool.tool_material }}</span>{% endif %}
+
+        {{ m.amount(row.demand, row.node.ix) }}
+        {% if row.uses %}<span class="tiny muted nowrap"
+             title="how many times the tool is used here. The quantity is that divided by how many crafts one tool lasts">{{ qty(row.uses) }}
+             {{ plural(row.uses, 'use') }}</span>
+        {% elif exact(row.demand) %}<span class="tiny muted nowrap">({{ exact(row.demand) }})</span>{% endif %}
+
+        {% if n.choice.auto %}
+          <span class="badge" title="copied from where you already worked out how to make this item — change it like anything else">copied</span>
+        {% endif %}
+        {% if row.snode and row.snode.looped %}
+          {# Reported, not cut: §14 step 3. The counts below are real, they are
+             just reached by iteration rather than by recursion. #}
+          <span class="badge" title="this item is needed, directly or indirectly, to make itself. The amounts are still worked out; picking a different recipe anywhere round the loop removes it">loops</span>
+        {% endif %}
+        {% if row.kind == 'recipe' and row.recipe %}
+          <span class="badge recipe" title="{{ row.recipe.rid }}">{{ row.recipe.name }}</span>
+          <span class="acts"><a class="btn small" href="{{ url_for('node_view', pid=plan.id, nid=n.id) }}">change</a></span>
+        {% elif row.kind == 'stop' %}
+          <span class="badge stop">final</span>
+          {% if n.choice.kind == 'open' %}<span class="badge" title="this item is final everywhere in this plan">everywhere</span>{% endif %}
+          <span class="acts">
+            {# The inverse of the button below, and it saves the same trip. #}
+            <form class="inline" method="post" action="{{ url_for('open_node', pid=plan.id, nid=n.id) }}">
+              <button class="small ghost" title="stop treating {{ row.obj.name if row.obj else 'this item' }} as final, here and everywhere else in this plan">reopen</button>
+            </form>
+            <a class="btn small" href="{{ url_for('node_view', pid=plan.id, nid=n.id) }}">edit</a></span>
+        {% elif row.kind == 'plan' %}
+          <span class="badge recipe">{{ row.note }}</span>
+          <span class="acts"><a class="btn small" href="{{ url_for('node_view', pid=plan.id, nid=n.id) }}">change</a></span>
+        {% else %}
+          {% if row.note %}<span class="badge gated" title="{{ row.note }}">{{ row.note }}</span>{% endif %}
+          <span class="acts">
+            {# Marking a leaf final is the commonest thing to do on this screen
+               and it needs no context from the node page, so it lives here.
+               Plan-wide, like the node page's default; the one-node-only case
+               is rare enough to be worth the trip. #}
+            <form class="inline" method="post" action="{{ url_for('stop_node', pid=plan.id, nid=n.id) }}">
+              <button class="small" title="buy or mine {{ row.obj.name if row.obj else 'this' }} instead of making it — everywhere in this plan, including anywhere it turns up later. Open the item to do just this one.">final</button>
+            </form>
+            <a class="btn small primary" href="{{ url_for('node_view', pid=plan.id, nid=n.id) }}">choose &hellip;</a></span>
+        {% endif %}
+      </div>
+    {% else %}
+      <div style="padding:14px" class="muted">Add an item above to start.</div>
+    {% endfor %}
+    </div>
+  </div>
+  <p class="tiny muted">Change how many you want and everything below is worked
+    out again. <b>Fractional rows are normal, and usually mean a shared run</b>: a
+    recipe that makes 2 plates from 3 ingots, asked for 1 plate, is half a run and
+    shows 1.5 ingots. Rounding up happens once, across every branch that uses the
+    same recipe, so the shares add back up to a whole number of runs. A worn tool
+    is fractional for a different reason: you only use up part of it.</p>
+</div>
+
+<!-- ================= the four views ================= -->
+<div>
+  <div class="tabs">
+    {% for key, label in [('bom','bill of materials'), ('raw','raw materials'),
+                          ('schedule','schedule'),
+                          ('machines','machines'), ('surplus','surplus'),
+                          ('warnings','warnings')] %}
+      <a class="{{ 'on' if view == key else '' }}"
+         href="{{ url_for('plan_view', pid=plan.id, view=key) }}">{{ label }}{%
+         if key == 'warnings' and sol.warnings %} ({{ sol.warnings|length }}){% endif %}</a>
+    {% endfor %}
+  </div>
+
+  {% if view == 'bom' %}
+  <div class="panel">
+    <h3>What you must obtain</h3>
+    <p class="tiny muted">Everything you have to get hold of, alongside what the
+      plan makes for you. An item is often both &mdash; you make some and buy the
+      rest. The status column tells you whether anything is still undecided.</p>
+    <table>
+      <thead><tr><th>item</th><th class="num">obtain</th><th class="num">made</th>
+                 <th class="num">total</th><th>status</th></tr></thead>
+      <tbody>
+      {% for r in sol.report %}
+        {% if r.obtain > 0 or r.made > 0 %}
+        <tr>
+          <td><div class="row">{{ m.thing(obj(r.ix), 'sm') }}</div></td>
+          <td class="num">{% if r.obtain %}{{ m.amount(r.obtain, r.ix, 'qb strong') }}
+              {% if ceil_qty(r.obtain) != r.obtain %}<div class="tiny muted">buy {{ qty(ceil_qty(r.obtain), r.ix) }}</div>{% endif %}
+              {# A worn tool in units you can act on: "0.195 of a File" is 25 uses. #}
+              {% if r.bom and r.bom.uses %}<div class="tiny muted"
+                   title="how many times the tool is used across this plan">{{ qty(r.bom.uses) }}
+                   {{ plural(r.bom.uses, 'use') }}{% if r.bom.crafts %} of {{ qty(r.bom.crafts) }}{% endif %}</div>{% endif %}
+              {% else %}<span class="muted">&mdash;</span>{% endif %}</td>
+          <td class="num">{% if r.made %}{{ m.amount(r.made, r.ix, 'qb') }}{% else %}<span class="muted">&mdash;</span>{% endif %}</td>
+          <td class="num">{{ m.amount(r.total, r.ix, 'qb') }}</td>
+          <td>
+            {% set b = r.bom %}
+            {% if b %}
+              {% if b.open > 0 %}<span class="badge open">{{ qty(b.open, r.ix) }} undecided</span>{% endif %}
+              {% if b.stop > 0 %}<span class="badge stop">{{ qty(b.stop, r.ix) }} final</span>{% endif %}
+              {% if b.makeable is false %}<span class="badge">raw &mdash; nothing makes it</span>{% endif %}
+            {% endif %}
+            {% for s in r.sched %}
+              <span class="badge recipe" title="{{ s.runs }} runs">{{ qty(s.produced, r.ix) }} &times; {{ s.recipe.name }}</span>
+            {% endfor %}
+          </td>
+        </tr>
+        {% endif %}
+      {% else %}
+        <tr><td colspan="5" class="muted">Nothing yet.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% elif view == 'raw' %}
+  <div class="panel">
+    <h3>Raw materials &mdash; {{ sol.bom|length }} {{ plural(sol.bom|length, 'thing') }} to obtain</h3>
+    <p class="tiny muted">Everything the plan does <em>not</em> make for you
+      &mdash; the shopping list. The bill of materials tab shows these next to what
+      you make. <b>Open a row to see what is using it.</b></p>
+    {% for r in sol.bom %}
+      <details class="rawrow">
+        <summary>
+          <span class="row">
+            {{ m.thing(obj(r.ix), 'sm') }}
+            <span class="grow"></span>
+            {% if r.open > 0 %}<span class="badge open">{{ qty(r.open, r.ix) }} undecided</span>{% endif %}
+            {% if r.stop > 0 %}<span class="badge stop">{{ qty(r.stop, r.ix) }} final</span>{% endif %}
+            {% if r.makeable is false %}<span class="badge" title="no recipe in the pack data makes it">nothing makes it</span>{% endif %}
+            {{ m.amount(r.qty, r.ix) }}
+            {% if ceil_qty(r.qty) != r.qty %}<span class="tiny muted nowrap">buy {{ qty(ceil_qty(r.qty), r.ix) }}</span>{% endif %}
+            {% if r.uses %}<span class="tiny muted nowrap">{{ qty(r.uses) }} {{ plural(r.uses, 'use') }}{% if r.crafts %} of {{ qty(r.crafts) }}{% endif %}</span>{% endif %}
+          </span>
+        </summary>
+        <div class="into">
+          {% for d in r.into %}
+            <div class="row">
+              {{ m.amount(d.qty, r.ix) }}
+              <span class="muted tiny">into</span>
+              {% if d.root %}
+                <span class="muted">something you asked for directly</span>
+              {% else %}
+                {{ m.thing(obj(d.ix), 'sm') }}
+                {% if d.recipe %}{{ m.machine_badge(d.recipe) }}{% endif %}
+              {% endif %}
+              {% if d.uses %}<span class="tiny muted nowrap">{{ qty(d.uses) }} {{ plural(d.uses, 'use') }}</span>{% endif %}
+              {% if d.places > 1 %}<span class="tiny muted nowrap" title="needed in {{ d.places }} places by this recipe, added up into one line">{{ d.places }} places</span>{% endif %}
+            </div>
+          {% endfor %}
+          {% if r.owned %}
+            <p class="tiny muted">You keep this rather than use it up, so the
+              total is the largest single amount needed at once, not the sum of the
+              lines above. You need one, not one per place it appears.</p>
+          {% endif %}
+        </div>
+      </details>
+    {% else %}
+      <p class="muted">Nothing to obtain yet &mdash; add a root and expand it.</p>
+    {% endfor %}
+  </div>
+
+  {% elif view == 'schedule' %}
+  <div class="panel">
+    <h3>How many of each item, by which recipe</h3>
+    <p class="tiny muted">One card per item and recipe, so making some plates in
+      a forge hammer and the rest on a crafting table gives you two cards. Demand
+      is added up across the whole plan before it is rounded up to whole runs.</p>
+    {% for s in sol.schedule %}
+      <div class="card">
+        <h3>{{ m.thing(obj(s.ix), 'sm') }} {{ m.machine_badge(s.recipe) }}
+          {% if s.chance < 1 %}<span class="badge chance">{{ (s.chance*100)|round(1) }}% chance</span>{% endif %}
+          <span class="right nowrap"><b>{{ s.runs }}</b> {{ plural(s.runs, 'run') }}</span>
+        </h3>
+        <div class="small muted">demand {{ qty(s.demand, s.ix) }}{{ unit(s.ix) }} &middot; {{ qty(s.per_run) }}{{ unit(s.ix) }} per run
+          &rarr; produces {{ qty(s.produced, s.ix) }}{{ unit(s.ix) }}
+          {% if s.produced > s.demand %}<span class="badge">{{ qty(s.produced - s.demand, s.ix) }} spare</span>{% endif %}</div>
+        <div class="slotgrid">
+          {% for i in s.inputs %}
+          <div class="slot">
+            {{ m.thing(obj(i.ix), 'sm') }}
+            <span class="x">&times;{{ qty(i.qty, i.ix) }}{{ unit(i.ix) }}</span>
+            {% if i.designation.kind != 'consumed' %}
+              <span class="badge tool" title="{{ i.designation.why }}">{{ i.designation.kind }}</span>
+            {% endif %}
+            {% if i.uses %}<span class="tiny muted nowrap"
+                 title="used {{ qty(i.uses) }} {{ plural(i.uses, 'time') }} here, out of the {{ i.crafts }} crafts one tool lasts">{{ qty(i.uses) }}
+                 {{ plural(i.uses, 'use') }}{% if i.crafts %} of {{ qty(i.crafts) }}{% endif %}</span>{% endif %}
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    {% else %}
+      <p class="muted">No recipe chosen yet.</p>
+    {% endfor %}
+  </div>
+
+  {% elif view == 'machines' %}
+  <div class="panel">
+    <h3>Machines this route needs</h3>
+    <p class="tiny muted">What you need to own to run this route. None of it is
+      counted as a cost &mdash; building an assembler is not part of the price of a
+      resistor. Each recipe is listed once, under the lowest voltage that runs
+      it.</p>
+    <table>
+      <thead><tr><th>machine</th><th>recipe map</th><th>min tier</th>
+                 <th class="num">recipes</th><th class="num">runs</th></tr></thead>
+      <tbody>
+      {% for mm in sol.machines %}
+        <tr><td>{{ mm.name }}</td><td class="mono tiny">{{ mm.map }}</td>
+            <td>{{ mm.tier or '&mdash;'|safe }}</td>
+            <td class="num">{{ mm.recipes }}</td><td class="num">{{ mm.runs }}</td></tr>
+      {% else %}
+        <tr><td colspan="5" class="muted">No recipe chosen yet.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% elif view == 'surplus' %}
+  <div class="panel">
+    <h3>Spare output</h3>
+    <p class="tiny muted">What the plan produces beyond what it needs. It is not
+      subtracted from anything for you &mdash; if you want to use it, lower a
+      quantity yourself or mark an item final.</p>
+    <table>
+      <thead><tr><th>item</th><th class="num">spare</th><th>why</th></tr></thead>
+      <tbody>
+      {% for s in sol.surplus %}
+        <tr><td><div class="row">{{ m.thing(obj(s.ix), 'sm') }}</div></td>
+            <td class="num">{{ m.amount(s.qty, s.ix, 'qb strong') }}</td>
+            <td>{% if s.byproduct %}<span class="badge">byproduct</span>{% else %}<span class="badge">extra from rounding up</span>{% endif %}
+                {% if s.chance < 1 %}<span class="badge chance">{{ (s.chance*100)|round(1) }}% chance &mdash; an average, not a guarantee</span>{% endif %}</td></tr>
+      {% else %}
+        <tr><td colspan="3" class="muted">Nothing spare.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% else %}
+  <div class="panel">
+    <h3>Things worth knowing about this plan</h3>
+    {% set WARN_LABEL = {'cycle': 'loop', 'dangling': 'recipe missing',
+                         'fixpoint': 'did not settle', 'unknown-item': 'unknown item',
+                         'malformed': 'broken plan file', 'plan': 'plan missing',
+                         'chanced': 'chance output', 'wear': 'tool wear',
+                         'wear-rate': 'assumed wear rate',
+                         'unmakeable': 'nothing makes it'} %}
+    {% if sol.warnings %}
+    <ul class="warnings">
+      {% for wn in sol.warnings %}
+        <li class="{{ 'bad' if wn.kind in ('cycle','dangling','fixpoint','unknown-item') else '' }}">
+          <b class="small">{{ WARN_LABEL.get(wn.kind, wn.kind) }}</b><br>{{ wn.text }}</li>
+      {% endfor %}
+    </ul>
+    {% else %}
+      <p class="muted">Nothing to flag.</p>
+    {% endif %}
+    <div class="hr"></div>
+    <p class="tiny muted">True of every plan: nothing here counts time, EU or
+      throughput, and the cheapest route in materials is often not the one you
+      should build. Fractional amounts are a lower bound, and recipes with a
+      chanced output give you an average rather than a guarantee.</p>
+  </div>
+  {% endif %}
+
+  {% if plan.machines is not none %}
+    <p class="tiny muted">You have said which machines you own. Recipes you
+      cannot run yet are still listed, marked
+      <span class="badge gated">gated</span> &mdash; that means "build the machine
+      first", not "this costs more".</p>
+  {% endif %}
+</div>
+</div>
+{% endblock %}
+
+{% block scripts %}<script src="{{ url_for('static', filename='app.js') }}"></script>{% endblock %}

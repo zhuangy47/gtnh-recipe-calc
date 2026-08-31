@@ -1,0 +1,10 @@
+{
+ "by_item": {
+  "gregtech:gt.metatool.01@12": "worn",
+  "gregtech:gt.metatool.01@120": "worn",
+  "gregtech:gt.metatool.01@16": "worn",
+  "gregtech:gt.metatool.01@26": "worn"
+ },
+ "by_recipe_input": {},
+ "note": "User corrections to consumption designations. Derived designations are never stored here, so a re-export refreshes them and leaves these alone."
+}

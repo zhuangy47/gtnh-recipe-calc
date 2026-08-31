@@ -1,0 +1,281 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m with context %}
+{% block title %}{{ plan.name }} &mdash; build order{% endblock %}
+
+{# What to make, where, and in what order.  The unit is the schedule row, so a
+   box is one trip to one machine however many branches wanted the thing.  Both
+   shapes are rendered from the same `order.walk`: the list is the whole of it
+   and needs no JavaScript, the drawing is the list positioned.  Every step
+   carries `data-step`, and the tick handler repaints both by that -- so the
+   two can no more disagree here than the route's list and graph can. #}
+
+{% macro tickform(st) -%}
+<form class="stick" method="post" data-tick="{{ st.id }}"
+      action="{{ url_for('step_done', pid=plan.id, sid=st.id) }}">
+  <input type="hidden" name="state" value="{{ 'todo' if st.done else 'done' }}">
+  <button class="tickbtn" type="submit"
+          title="{{ 'you have done this &mdash; click to put it back on the list'|safe if st.done else 'mark this done, and light up whatever it unlocks'|safe }}"
+          aria-label="{{ 'done' if st.done else 'not done yet' }}"
+          >{{ '&#10003;'|safe if st.done else '' }}</button>
+</form>
+{%- endmacro %}
+
+{% macro where(st) -%}
+{% if st.kind == 'obtain' %}<span class="badge">obtain</span>
+{% elif st.recipe %}{{ m.machine_badge(st.recipe) }}{% endif %}
+{%- endmacro %}
+
+{# How many of the item first, the run count after -- and the same way round
+   for both kinds of step, so the bold number on every box answers one question:
+   how many of this thing. Runs are how you get there, not what you wanted. #}
+{% macro amount(st) -%}
+{% if st.kind == 'obtain' %}{{ m.amount(st.qty, st.ix) }}
+  {%- if ceil_qty(st.qty) != st.qty %} <span class="tiny muted nowrap">get {{ qty(ceil_qty(st.qty), st.ix) }}</span>{% endif %}
+{% else %}{{ m.amount(st.qty, st.ix) }}
+  <span class="tiny muted nowrap">in {{ st.runs }} {{ plural(st.runs, 'run') }}</span>
+{% endif %}
+{%- endmacro %}
+
+{% block body %}
+
+<div class="gbar spread">
+  <div class="row wrap">
+    <a class="btn small" href="{{ url_for('plan_view', pid=plan.id) }}">&larr; {{ plan.name }}</a>
+    <span class="tabs" style="margin:0">
+      <a href="{{ url_for('plan_view', pid=plan.id) }}">list</a>
+      <a href="{{ url_for('plan_graph', pid=plan.id) }}">graph</a>
+      <a class="on" href="{{ url_for('plan_steps', pid=plan.id) }}">build order</a>
+    </span>
+    {% if open_n %}
+      <a class="btn small" href="{{ url_for('plan_view', pid=plan.id) }}"
+         title="an undecided item is not in the order yet &mdash; it is on your shopping list instead">
+        <span class="badge open">{{ open_n }} still to decide</span></a>
+    {% endif %}
+  </div>
+  <div class="row wrap small">
+    <span class="tabs" style="margin:0" id="smode">
+      <a href="#" data-mode="graph">graph</a>
+      <a href="#" data-mode="list">list</a>
+    </span>
+    {{ m.units_toggle() }}
+    <span class="sonly-graph row" hidden>
+      <button class="small" id="sfit" type="button" title="scale the whole order into view">fit</button>
+      <button class="small" id="sout" type="button" title="zoom out">&minus;</button>
+      <span class="mono tiny muted" id="szoom" style="min-width:4ch;text-align:center">100%</span>
+      <button class="small" id="sin" type="button" title="zoom in">+</button>
+    </span>
+  </div>
+</div>
+
+{# Where you have got to.  One bar, three numbers, and the button that finds
+   the next thing you can actually do. #}
+<div class="sprog panel">
+  <div class="row wrap">
+    <b id="scount-done">{{ order.done }}</b><span class="muted small">of {{ order.total }} steps done</span>
+    <span class="badge open" id="scount-ready">{{ order.ready }} you can do now</span>
+    <span class="badge" id="scount-blocked">{{ order.blocked }} waiting</span>
+    {% if order.stale %}<span class="badge short" id="scount-stale">{{ order.stale }} need more</span>
+    {% else %}<span class="badge short" id="scount-stale" hidden></span>{% endif %}
+    <span class="grow"></span>
+    <button class="small" id="snext" type="button" hidden
+            title="go to the next step you can start">next thing to do &rarr;</button>
+    {% if order.done %}
+    <form class="inline" method="post" action="{{ url_for('clear_progress', pid=plan.id) }}"
+          onsubmit="return confirm('Untick every step in this plan?')">
+      <button class="small ghost">untick everything</button>
+    </form>
+    {% endif %}
+  </div>
+  <div class="sbar"><span id="sbarfill" style="width:{{ (100 * order.done / order.total)|round(1) if order.total else 0 }}%"></span></div>
+</div>
+
+{% if orphan_ticks %}
+<p class="note warn small">{{ orphan_ticks }} {{ plural(orphan_ticks, 'tick') }}
+  {{ plural(orphan_ticks, 'belongs', 'belong') }} to a step this plan no longer has &mdash;
+  you changed a recipe under it. The work is remembered in case you change back.
+  <form class="inline" method="post" action="{{ url_for('clear_progress', pid=plan.id) }}">
+    <input type="hidden" name="scope" value="orphans">
+    <button class="small ghost">forget {{ 'it' if orphan_ticks == 1 else 'them' }}</button>
+  </form></p>
+{% endif %}
+
+<!-- ================= the drawing ================= -->
+<div class="gview sonly-graph" id="sview" data-pid="{{ plan.id }}" hidden>
+  <div class="gpop" id="spop" hidden></div>
+  <div class="gworld pending" id="sworld">
+    <svg class="gedges" id="sedges" aria-hidden="true"></svg>
+    {% for col in order.layers %}
+      <div class="scolhead{{ ' goals' if order.goal_layer == loop.index0 }}"
+           data-layer="{{ loop.index0 }}">
+        <b>{{ loop.index }}</b>
+        <span class="tiny muted">{{ col|length }}
+          {%- if order.goal_layer == loop.index0 %} you asked for
+          {%- elif loop.first %} {{ plural(col|length, 'thing') }} to get
+          {%- else %} at once{% endif %}</span>
+      </div>
+    {% endfor %}
+    {% for st in order.walk %}
+      <div class="snode is-{{ st.state }} kind-{{ st.kind }}{{ ' looped' if st.looped else '' }}"
+           id="{{ st.id }}" data-step="{{ st.id }}" data-layer="{{ st.layer }}"
+           data-needs="{{ st.needs|sort|join(' ') }}">
+        {{ tickform(st) }}
+        <span class="shit" tabindex="0" role="button"
+              title="{{ obj(st.ix).name if obj(st.ix) else 'unknown item' }}&#10;{% if st.kind == 'obtain' %}obtain {{ qty(st.qty, st.ix) }}{{ unit(st.ix) }}{% else %}{{ qty(st.qty, st.ix) }}{{ unit(st.ix) }} in {{ st.runs }} {{ plural(st.runs, 'run') }} of {{ st.recipe.name if st.recipe }}{% endif %}{% if stack_note(st.qty, st.ix) %} ({{ stack_note(st.qty, st.ix) }}){% endif %}&#10;click for what goes in and what it unlocks">
+          <span class="gline">
+            <img class="icon sm" src="{{ url_for('icon', ix=st.ix) }}" alt=""
+                 width="22" height="22" loading="lazy" decoding="async">
+            <span class="gname trunc">{{ obj(st.ix).name if obj(st.ix) else '(unknown)' }}</span>
+          </span>
+          <span class="gline gsub">
+            {{ amount(st) }}
+            {% if st.kind == 'obtain' %}<span class="badge trunc">obtain</span>
+            {% elif st.recipe %}<span class="badge recipe trunc">{{ st.recipe.name }}</span>{% endif %}
+            {% if st.root %}<span class="badge goal">your goal</span>{% endif %}
+            {% if st.looped %}<span class="badge">loop</span>{% endif %}
+            <span class="sflag badge short" {% if not st.redo %}hidden{% endif %}
+                  title="you ticked this at {{ st.done_n }}; the plan asks for more now">{{ redo_label(st) }} more</span>
+          </span>
+        </span>
+      </div>
+    {% endfor %}
+  </div>
+  {% if not order.walk %}
+    <div class="gempty muted">Nothing to build yet &mdash;
+      <a href="{{ url_for('plan_view', pid=plan.id) }}">pick a recipe</a> first.</div>
+  {% endif %}
+</div>
+
+<!-- ================= the same thing, in order ================= -->
+<div id="slist">
+  {% for col in order.layers %}
+    <h2 class="sstage">Step {{ loop.index }}
+      <span class="muted" style="text-transform:none;letter-spacing:normal">
+        &mdash; {{ col|length }} {{ plural(col|length, 'thing') }},
+        {% if order.goal_layer == loop.index0 %}and {{ 'it is' if col|length == 1 else 'they are' }} what you asked this plan for{%
+           elif loop.first %}none of which this plan makes for you{%
+           elif col|length == 1 %}on its own{%
+           else %}all at the same time if you like{% endif %}</span>
+    </h2>
+    <div class="panel" style="padding:0">
+    {% for st in col %}
+      <details class="srow is-{{ st.state }} kind-{{ st.kind }}" data-step="{{ st.id }}">
+        <summary>
+          <span class="row">
+            {{ tickform(st) }}
+            {{ m.thing(obj(st.ix), 'sm') }}
+            <span class="grow"></span>
+            {% if st.root %}<span class="badge goal">what you asked for</span>{% endif %}
+            {% if st.looped %}<span class="badge"
+                 title="this and {{ st.loop_with|length }} other {{ plural(st.loop_with|length, 'step') }} need each other, so there is no first one. Do them together; the amounts are already worked out">loop</span>{% endif %}
+            {% if st.chance < 1 %}<span class="badge chance">{{ (st.chance*100)|round(1) }}% chance</span>{% endif %}
+            {% if st.kind == 'obtain' and st.makeable is false %}<span class="badge">nothing makes it</span>{% endif %}
+            {% if st.kind == 'obtain' and st.owned %}<span class="badge tool" title="you keep this rather than use it up">you own one</span>{% endif %}
+            {{ where(st) }}
+            {{ amount(st) }}
+            <span class="sflag badge short" {% if not st.redo %}hidden{% endif %}
+                  title="you ticked this when it was {{ st.done_n }}; the plan asks for more now">{{ redo_label(st) }} more</span>
+          </span>
+        </summary>
+        <div class="sdet">
+          {% if st.kind == 'obtain' %}
+            <p class="small">Get hold of <b>{{ qty(ceil_qty(st.qty), st.ix) }}</b>{{ unit(st.ix) }}
+              {% if ceil_qty(st.qty) != st.qty %}<span class="muted">(the plan needs {{ qty(st.qty, st.ix) }})</span>{% endif %}.
+              {% if st.makeable is false %}Nothing in the pack data makes it, so you mine, gather or buy it.
+              {% elif st.owned %}You keep this rather than use it up &mdash; one is enough however many
+                steps below reach for it.
+              {% else %}This plan does not make it for you: you marked it final, or nothing has been
+                chosen for it yet.{% endif %}
+              {% if st.uses %} It gets picked up <b>{{ qty(st.uses) }}</b> {{ plural(st.uses, 'time') }}{% if st.crafts %}
+                out of the {{ qty(st.crafts) }} one lasts{% endif %}.{% endif %}</p>
+          {% else %}
+            {# The recipe map's name already carries its tier -- "Forge Hammer
+               (LV)" -- so saying "at LV or better" after it read as a stutter.
+               The minimum tier is on the badge in the row above. #}
+            <p class="small">Run <b>{{ st.runs }}</b> &times;
+              <b>{{ st.recipe.name if st.recipe }}</b>, making {{ qty(st.qty, st.ix) }}{{ unit(st.ix) }}
+              of {{ obj(st.ix).name if obj(st.ix) else st.ix }}{% if st.spare > 0 %}
+              &mdash; <span class="muted">{{ qty(st.spare, st.ix) }} more than this plan needs</span>{% endif %}.
+              {% if st.chance < 1 %}It comes off a {{ (st.chance*100)|round(1) }}% chance output, so
+              that is an average rather than a guarantee.{% endif %}</p>
+            <div class="sneed">
+              {% for i in st.inputs %}
+                <div class="row">
+                  {{ m.amount(i.qty, i.ix) }}
+                  {{ m.thing(obj(i.ix), 'sm') }}
+                  {% if i.designation.kind != 'consumed' %}
+                    <span class="badge tool" title="{{ i.designation.why }}">{{ i.designation.kind }}</span>{% endif %}
+                  {% if i.uses %}<span class="tiny muted nowrap">{{ qty(i.uses) }} {{ plural(i.uses, 'use') }}{% if i.crafts %} of {{ qty(i.crafts) }}{% endif %}</span>{% endif %}
+                  <span class="grow"></span>
+                  {% for src in i['from'] %}
+                    {% set fs = order.get(src) %}
+                    {% if fs %}
+                      <a class="sgoto tiny" href="#{{ src }}" data-goto="{{ src }}"
+                         title="the step that gives you this">{% if fs.kind == 'obtain' %}from your shopping list{% else %}from step {{ fs.layer + 1 }}, {{ fs.recipe.name if fs.recipe }}{% endif %}</a>
+                    {% endif %}
+                  {% endfor %}
+                </div>
+              {% endfor %}
+            </div>
+          {% endif %}
+          {% if st.root and st.earliest != st.layer %}
+            <p class="tiny muted" style="margin:6px 0 0">Drawn in the last
+              column with the other things you asked for. Nothing is stopping you
+              making it as early as step {{ st.earliest + 1 }}.</p>
+          {% endif %}
+          {% if st.feeds %}
+            <p class="tiny muted" style="margin:6px 0 0">Goes into:
+              {% for f in st.feeds|sort %}{% set fs = order.get(f) %}{% if fs %}
+                <a class="sgoto" href="#{{ f }}" data-goto="{{ f }}">{{ obj(fs.ix).name if obj(fs.ix) else fs.ix }}</a>{% if not loop.last %},{% endif %}
+              {% endif %}{% endfor %}</p>
+          {% elif st.root %}
+            <p class="tiny muted" style="margin:6px 0 0">This is what you asked the plan for.</p>
+          {% endif %}
+          {% if st.looped %}
+            <p class="tiny muted" style="margin:6px 0 0">This step and
+              {% for f in st.loop_with %}{% set fs = order.get(f) %}{% if fs %}
+                <a class="sgoto" href="#{{ f }}" data-goto="{{ f }}">{{ obj(fs.ix).name if obj(fs.ix) else fs.ix }}</a>{% if not loop.last %},{% endif %}
+              {% endif %}{% endfor %}
+              need each other, so none of them is first. Do them together &mdash; the amounts
+              are already worked out. Choosing a different recipe anywhere round the loop
+              removes it.</p>
+          {% endif %}
+          {% if st.blocked_by %}
+            <p class="tiny muted" style="margin:6px 0 0">Waiting on
+              {{ st.blocked_by|length }} earlier {{ plural(st.blocked_by|length, 'step') }}
+              &mdash;
+              {% for b in st.blocked_by %}{% set bs = order.get(b) %}{% if bs %}
+                <a class="sgoto" href="#{{ b }}" data-goto="{{ b }}">{{ obj(bs.ix).name if obj(bs.ix) else bs.ix }}</a>{% if not loop.last %},{% endif %}
+              {% endif %}{% endfor %}.</p>
+          {% endif %}
+        </div>
+      </details>
+    {% endfor %}
+    </div>
+  {% else %}
+    <div class="panel muted">Nothing to build yet. Pick a recipe on the
+      <a href="{{ url_for('plan_view', pid=plan.id) }}">route</a> first &mdash; an item
+      you have not decided about is something to obtain, not something to make.</div>
+  {% endfor %}
+</div>
+
+<p class="tiny muted" style="margin-top:10px">One box is <b>one trip to one
+  machine</b>, not one branch of the route: every branch wanting copper plates by
+  the same recipe is the same trip, and the run count is all of them added up.
+  <b>Everything in a column can be done at the same time</b> &mdash; nothing in a
+  column needs anything else in it. A box is
+  <span class="badge open">lit</span> when you have everything it needs, dim when
+  you do not; tick one off and whatever it unlocks lights up. Ticking remembers
+  <em>how many</em> you did, so raising a quantity later says how many more you
+  need rather than quietly unticking. The first column is your shopping list:
+  nothing in this plan makes it for you, and <b>the last column is what you asked
+  for</b> &mdash; the goals share it even where one could have been finished
+  earlier, so the drawing has an end. Steps marked
+  <span class="badge">loop</span> need each other and go together.
+  <span class="sonly-graph" hidden>Drag to pan, <b>ctrl+wheel</b> to zoom, wheel
+  to scroll; click a box for what goes in and what it unlocks.</span></p>
+
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='steps.js') }}"></script>
+{% endblock %}
